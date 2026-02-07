@@ -3,9 +3,9 @@ package com.miry.ui.widgets;
 import com.miry.graphics.Framebuffer;
 import com.miry.graphics.Shader;
 import com.miry.graphics.Texture;
+import com.miry.ui.gizmo.TranslateGizmo3D;
 import com.miry.ui.input.UiInput;
 import org.joml.Matrix4f;
-import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
@@ -47,6 +47,8 @@ import static org.lwjgl.opengl.GL15.glDeleteBuffers;
 public final class Viewport3D implements AutoCloseable {
     private final Framebuffer framebuffer = new Framebuffer();
     private final Shader shader = Shader.fromResources("shaders/viewport3d.vert", "shaders/viewport3d.frag");
+    private final TranslateGizmo3D gizmo = new TranslateGizmo3D();
+    private final UiInput framebufferInput = new UiInput();
 
     private final int cubeVao;
     private final int cubeVbo;
@@ -58,6 +60,11 @@ public final class Viewport3D implements AutoCloseable {
     private int linesCapacityFloats = 0;
     private int linesVertexCount = 0;
 
+    private final int gizmoVao;
+    private final int gizmoVbo;
+    private int gizmoCapacityFloats = 0;
+    private int gizmoVertexCount = 0;
+
     private final Vector3f target = new Vector3f(0.0f, 0.0f, 0.0f);
     private float yaw = 0.6f;
     private float pitch = 0.35f;
@@ -66,13 +73,6 @@ public final class Viewport3D implements AutoCloseable {
     private boolean orbiting;
     private float lastMouseX;
     private float lastMouseY;
-
-    private GizmoAxis hoveredAxis = GizmoAxis.NONE;
-    private GizmoAxis activeAxis = GizmoAxis.NONE;
-    private final Vector3f dragStartPos = new Vector3f();
-    private float dragStartMouseX;
-    private float dragStartMouseY;
-    private float axisWorldPerPx;
 
     private final Vector3f objectPos = new Vector3f(0.0f, 0.0f, 0.0f);
 
@@ -131,6 +131,17 @@ public final class Viewport3D implements AutoCloseable {
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, 3L * Float.BYTES);
         glBindVertexArray(0);
+
+        gizmoVao = glGenVertexArrays();
+        gizmoVbo = glGenBuffers();
+        glBindVertexArray(gizmoVao);
+        glBindBuffer(GL_ARRAY_BUFFER, gizmoVbo);
+        glBufferData(GL_ARRAY_BUFFER, 1L, GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0L);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, 3L * Float.BYTES);
+        glBindVertexArray(0);
     }
 
     public Texture texture() {
@@ -149,6 +160,25 @@ public final class Viewport3D implements AutoCloseable {
                             int viewportY,
                             int viewportW,
                             int viewportH) {
+        updateInput(input, rightDown, rightPressed, rightReleased, viewportX, viewportY, viewportW, viewportH, 1.0f, 1.0f);
+    }
+
+    /**
+     * Updates camera orbit/zoom and gizmo interaction.
+     *
+     * @param framebufferScaleX window→framebuffer scale (HiDPI)
+     * @param framebufferScaleY window→framebuffer scale (HiDPI)
+     */
+    public void updateInput(UiInput input,
+                            boolean rightDown,
+                            boolean rightPressed,
+                            boolean rightReleased,
+                            int viewportX,
+                            int viewportY,
+                            int viewportW,
+                            int viewportH,
+                            float framebufferScaleX,
+                            float framebufferScaleY) {
         if (input == null || viewportW <= 0 || viewportH <= 0) {
             return;
         }
@@ -182,34 +212,26 @@ public final class Viewport3D implements AutoCloseable {
         }
 
         // Gizmo hover + drag (left button only via UiInput).
-        if (!orbiting) {
-            hoveredAxis = inside ? hitTestGizmoAxis(mx, my, viewportX, viewportY, viewportW, viewportH) : GizmoAxis.NONE;
-        }
+        if (!orbiting && inside) {
+            float sx = Math.max(0.1f, framebufferScaleX);
+            float sy = Math.max(0.1f, framebufferScaleY);
 
-        if (input.mousePressed() && inside && !orbiting) {
-            if (hoveredAxis != GizmoAxis.NONE) {
-                activeAxis = hoveredAxis;
-                dragStartPos.set(objectPos);
-                dragStartMouseX = mx;
-                dragStartMouseY = my;
+            framebufferInput
+                .setMousePos(mx * sx, my * sy)
+                .setMouseButtons(input.mouseDown(), input.mousePressed(), input.mouseReleased())
+                .setScrollY(0.0);
 
-                axisWorldPerPx = computeAxisWorldPerPixel(activeAxis, viewportX, viewportY, viewportW, viewportH);
-            } else {
-                activeAxis = GizmoAxis.NONE;
-            }
-        }
-        if (activeAxis != GizmoAxis.NONE && input.mouseDown()) {
-            Vector2f axisDir = axisScreenDir(activeAxis, viewportX, viewportY, viewportW, viewportH);
-            float dx = mx - dragStartMouseX;
-            float dy = my - dragStartMouseY;
-            float pixelDelta = dx * axisDir.x + dy * axisDir.y;
-            float worldDelta = pixelDelta * axisWorldPerPx;
+            int vx = Math.round(viewportX * sx);
+            int vy = Math.round(viewportY * sy);
+            int vw = Math.round(viewportW * sx);
+            int vh = Math.round(viewportH * sy);
 
-            Vector3f axis = activeAxis.worldAxis();
-            objectPos.set(dragStartPos).fma(worldDelta, axis);
-        }
-        if (input.mouseReleased()) {
-            activeAxis = GizmoAxis.NONE;
+            Matrix4f proj = new Matrix4f().perspective((float) Math.toRadians(50.0), vw / (float) Math.max(1, vh), 0.05f, 200.0f);
+            Matrix4f view = new Matrix4f().lookAt(cameraPosition(), target, new Vector3f(0.0f, 1.0f, 0.0f));
+            Matrix4f vp = new Matrix4f(proj).mul(view);
+            Vector3f camPos = cameraPosition();
+
+            gizmo.update(framebufferInput, vp, camPos, vx, vy, vw, vh, objectPos);
         }
     }
 
@@ -247,8 +269,14 @@ public final class Viewport3D implements AutoCloseable {
         glDrawArrays(GL_LINES, 0, linesVertexCount);
         glBindVertexArray(0);
 
-        shader.unbind();
+        // Gizmo triangles rendered on top (no depth test).
         glDisable(GL_DEPTH_TEST);
+        updateGizmo(vp, camPos, pixelW, pixelH);
+        glBindVertexArray(gizmoVao);
+        glDrawArrays(GL_TRIANGLES, 0, gizmoVertexCount);
+        glBindVertexArray(0);
+
+        shader.unbind();
 
         Framebuffer.unbind(restoreViewportW, restoreViewportH);
     }
@@ -264,6 +292,27 @@ public final class Viewport3D implements AutoCloseable {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
+    private void updateGizmo(Matrix4f viewProj, Vector3f cameraPos, int pixelW, int pixelH) {
+        FloatBuffer buf = buildGizmoBuffer(viewProj, cameraPos, pixelW, pixelH);
+        glBindBuffer(GL_ARRAY_BUFFER, gizmoVbo);
+        if (buf.capacity() > gizmoCapacityFloats) {
+            gizmoCapacityFloats = buf.capacity();
+            glBufferData(GL_ARRAY_BUFFER, (long) gizmoCapacityFloats * Float.BYTES, GL_DYNAMIC_DRAW);
+        }
+        glBufferSubData(GL_ARRAY_BUFFER, 0, buf);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
+    private FloatBuffer buildGizmoBuffer(Matrix4f viewProj, Vector3f cameraPos, int pixelW, int pixelH) {
+        // Upper bound: each axis writes ribbon quad (6) + head tri (3), plus center quad (6).
+        int maxVerts = (3 * (6 + 3)) + 6;
+        FloatBuffer fb = BufferUtils.createFloatBuffer(maxVerts * 6);
+        gizmo.writeTriangles(fb, viewProj, cameraPos, 0, 0, pixelW, pixelH, objectPos);
+        fb.flip();
+        gizmoVertexCount = fb.remaining() / 6;
+        return fb;
+    }
+
     private FloatBuffer buildLinesBuffer() {
         // Each vertex: pos(3) + color(3)
         int gridCount = 21;
@@ -272,11 +321,7 @@ public final class Viewport3D implements AutoCloseable {
 
         int axisLines = 3;
         int axisVerts = axisLines * 2;
-
-        int gizmoLines = 3;
-        int gizmoVerts = gizmoLines * 2;
-
-        int totalVerts = gridVerts + axisVerts + gizmoVerts;
+        int totalVerts = gridVerts + axisVerts;
         FloatBuffer fb = BufferUtils.createFloatBuffer(totalVerts * 6);
 
         // Grid on XZ plane
@@ -295,25 +340,9 @@ public final class Viewport3D implements AutoCloseable {
         putLine(fb, 0, 0, 0, 0, 1.5f, 0, 0.25f, 0.85f, 0.25f);
         putLine(fb, 0, 0, 0, 0, 0, 1.5f, 0.25f, 0.45f, 0.95f);
 
-        // Gizmo axes at object position
-        float len = 1.2f;
-        putGizmoAxisLine(fb, GizmoAxis.X, len);
-        putGizmoAxisLine(fb, GizmoAxis.Y, len);
-        putGizmoAxisLine(fb, GizmoAxis.Z, len);
-
         fb.flip();
         linesVertexCount = fb.remaining() / 6;
         return fb;
-    }
-
-    private void putGizmoAxisLine(FloatBuffer fb, GizmoAxis axis, float len) {
-        Vector3f a = new Vector3f(objectPos);
-        Vector3f b = new Vector3f(objectPos).fma(len, axis.worldAxis());
-
-        Vector3f color = axis.baseColor();
-        boolean hot = axis == activeAxis || axis == hoveredAxis;
-        float m = hot ? 1.0f : 0.70f;
-        putLine(fb, a.x, a.y, a.z, b.x, b.y, b.z, color.x * m, color.y * m, color.z * m);
     }
 
     private static void putLine(FloatBuffer fb,
@@ -324,99 +353,12 @@ public final class Viewport3D implements AutoCloseable {
         fb.put(bx).put(by).put(bz).put(r).put(g).put(b);
     }
 
-    private GizmoAxis hitTestGizmoAxis(float mx, float my, int vx, int vy, int vw, int vh) {
-        float threshold = 10.0f;
-        float thr2 = threshold * threshold;
-
-        Vector2f o = project(objectPos, vx, vy, vw, vh);
-        GizmoAxis best = GizmoAxis.NONE;
-        float bestD = Float.MAX_VALUE;
-        float len = 1.2f;
-
-        for (GizmoAxis axis : GizmoAxis.values()) {
-            if (axis == GizmoAxis.NONE) {
-                continue;
-            }
-            Vector3f end3 = new Vector3f(objectPos).fma(len, axis.worldAxis());
-            Vector2f e = project(end3, vx, vy, vw, vh);
-            float d = distToSegment2(mx, my, o.x, o.y, e.x, e.y);
-            if (d < bestD) {
-                bestD = d;
-                best = axis;
-            }
-        }
-
-        return bestD <= thr2 ? best : GizmoAxis.NONE;
-    }
-
-    private float computeAxisWorldPerPixel(GizmoAxis axis, int vx, int vy, int vw, int vh) {
-        Vector2f o = project(objectPos, vx, vy, vw, vh);
-        Vector3f end3 = new Vector3f(objectPos).fma(1.0f, axis.worldAxis());
-        Vector2f e = project(end3, vx, vy, vw, vh);
-        float lenPx = (float) Math.sqrt(dist2(o.x, o.y, e.x, e.y));
-        if (lenPx < 1.0f) {
-            return 0.01f;
-        }
-        return 1.0f / lenPx;
-    }
-
-    private Vector2f axisScreenDir(GizmoAxis axis, int vx, int vy, int vw, int vh) {
-        Vector2f o = project(objectPos, vx, vy, vw, vh);
-        Vector3f end3 = new Vector3f(objectPos).fma(1.0f, axis.worldAxis());
-        Vector2f e = project(end3, vx, vy, vw, vh);
-        float dx = e.x - o.x;
-        float dy = e.y - o.y;
-        float len = (float) Math.sqrt(dx * dx + dy * dy);
-        if (len <= 0.0001f) {
-            return new Vector2f(1.0f, 0.0f);
-        }
-        return new Vector2f(dx / len, dy / len);
-    }
-
-    private Vector2f project(Vector3f p, int vx, int vy, int vw, int vh) {
-        Matrix4f proj = new Matrix4f().perspective((float) Math.toRadians(50.0), vw / (float) vh, 0.05f, 200.0f);
-        Matrix4f view = new Matrix4f().lookAt(cameraPosition(), target, new Vector3f(0.0f, 1.0f, 0.0f));
-        Matrix4f mvp = new Matrix4f(proj).mul(view);
-
-        org.joml.Vector4f clip = new org.joml.Vector4f(p, 1.0f);
-        mvp.transform(clip);
-        if (Math.abs(clip.w) < 0.00001f) {
-            return new Vector2f(vx, vy);
-        }
-
-        float ndcX = clip.x / clip.w;
-        float ndcY = clip.y / clip.w;
-
-        float sx = vx + (ndcX * 0.5f + 0.5f) * vw;
-        float sy = vy + (1.0f - (ndcY * 0.5f + 0.5f)) * vh;
-        return new Vector2f(sx, sy);
-    }
-
     private Vector3f cameraPosition() {
         float cp = (float) Math.cos(pitch);
         float sp = (float) Math.sin(pitch);
         float cy = (float) Math.cos(yaw);
         float sy = (float) Math.sin(yaw);
         return new Vector3f(cy * cp, sp, sy * cp).mul(distance).add(target);
-    }
-
-    private static float distToSegment2(float px, float py, float ax, float ay, float bx, float by) {
-        float abx = bx - ax;
-        float aby = by - ay;
-        float apx = px - ax;
-        float apy = py - ay;
-        float ab2 = abx * abx + aby * aby;
-        float t = ab2 > 0.00001f ? ((apx * abx + apy * aby) / ab2) : 0.0f;
-        t = clamp(t, 0.0f, 1.0f);
-        float cx = ax + abx * t;
-        float cy = ay + aby * t;
-        return dist2(px, py, cx, cy);
-    }
-
-    private static float dist2(float ax, float ay, float bx, float by) {
-        float dx = ax - bx;
-        float dy = ay - by;
-        return dx * dx + dy * dy;
     }
 
     private static float clamp(float v, float min, float max) {
@@ -432,31 +374,7 @@ public final class Viewport3D implements AutoCloseable {
         glDeleteBuffers(cubeEbo);
         glDeleteVertexArrays(linesVao);
         glDeleteBuffers(linesVbo);
-    }
-
-    private enum GizmoAxis {
-        NONE(new Vector3f()),
-        X(new Vector3f(1, 0, 0)),
-        Y(new Vector3f(0, 1, 0)),
-        Z(new Vector3f(0, 0, 1));
-
-        private final Vector3f axis;
-
-        GizmoAxis(Vector3f axis) {
-            this.axis = axis;
-        }
-
-        Vector3f worldAxis() {
-            return axis;
-        }
-
-        Vector3f baseColor() {
-            return switch (this) {
-                case X -> new Vector3f(0.95f, 0.32f, 0.32f);
-                case Y -> new Vector3f(0.32f, 0.95f, 0.42f);
-                case Z -> new Vector3f(0.35f, 0.55f, 0.98f);
-                default -> new Vector3f(0.8f, 0.8f, 0.8f);
-            };
-        }
+        glDeleteVertexArrays(gizmoVao);
+        glDeleteBuffers(gizmoVbo);
     }
 }
