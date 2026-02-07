@@ -3,6 +3,7 @@ package com.miry.ui;
 import com.miry.ui.anim.AnimationManager;
 import com.miry.ui.capture.PointerCapture;
 import com.miry.ui.clipboard.Clipboard;
+import com.miry.ui.core.OverlayQueue;
 import com.miry.ui.cursor.CursorManager;
 import com.miry.ui.dnd.DragDropManager;
 import com.miry.ui.event.EventQueue;
@@ -29,6 +30,7 @@ public final class UiContext implements AutoCloseable {
     private final DragDropManager dragDropManager;
     private final AnimationManager animationManager;
     private final UndoStack undoStack;
+    private final OverlayQueue overlayQueue;
     private float lastDt;
 
     public UiContext(long window) {
@@ -42,12 +44,14 @@ public final class UiContext implements AutoCloseable {
         this.dragDropManager = new DragDropManager();
         this.animationManager = new AnimationManager();
         this.undoStack = new UndoStack();
+        this.overlayQueue = new OverlayQueue();
     }
 
     public void update(float dt) {
         lastDt = Math.max(0.0f, dt);
         focusManager.beginFrame();
         animationManager.update(lastDt);
+        overlayQueue.beginFrame();
     }
 
     public float lastDt() {
@@ -68,6 +72,7 @@ public final class UiContext implements AutoCloseable {
     public DragDropManager dragDrop() { return dragDropManager; }
     public AnimationManager animations() { return animationManager; }
     public UndoStack undo() { return undoStack; }
+    public OverlayQueue overlay() { return overlayQueue; }
 
     @Override
     public void close() {

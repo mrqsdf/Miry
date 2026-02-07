@@ -24,6 +24,17 @@ public final class ComboBox<T> extends BaseWidget {
     private String filterText = "";
     private boolean ignorePopupPressThisFrame;
 
+    private boolean hasDeferredPopup;
+    private int deferredX;
+    private int deferredY;
+    private int deferredWidth;
+    private int deferredPopupMaxHeight;
+    private int deferredItemHeight;
+    private int deferredBgColor;
+    private int deferredHoverColor;
+    private int deferredTextColor;
+    private int deferredHoverIndex;
+
     public void addItem(T item) {
         items.add(item);
     }
@@ -51,12 +62,14 @@ public final class ComboBox<T> extends BaseWidget {
     public void setOpen(boolean open) {
         if (!enabled()) {
             this.open = false;
+            hasDeferredPopup = false;
             return;
         }
         this.open = open;
         if (!open) {
             filterText = "";
             highlightedIndex = -1;
+            hasDeferredPopup = false;
         } else {
             if (highlightedIndex < 0 || highlightedIndex >= items.size()) {
                 highlightedIndex = selectedIndex >= 0 ? selectedIndex : (items.isEmpty() ? -1 : 0);
@@ -264,6 +277,29 @@ public final class ComboBox<T> extends BaseWidget {
                           int popupMaxHeight,
                           int itemHeight,
                           boolean interactive) {
+        return render(r, ctx, input, theme, x, y, width, height, popupMaxHeight, itemHeight, interactive, false);
+    }
+
+    /**
+     * Render overload that can defer popup drawing to an overlay pass.
+     * <p>
+     * If {@code deferPopup} is true, this call renders the combo button and updates interaction
+     * state but does not draw the popup. If a {@link UiContext} is provided, the popup is queued
+     * into {@link UiContext#overlay()} automatically. If no context is available, the host can call
+     * {@link #renderDeferredPopup(UiRenderer)} later in the frame to draw the popup above other UI.
+     */
+    public boolean render(UiRenderer r,
+                          UiContext ctx,
+                          UiInput input,
+                          Theme theme,
+                          int x,
+                          int y,
+                          int width,
+                          int height,
+                          int popupMaxHeight,
+                          int itemHeight,
+                          boolean interactive,
+                          boolean deferPopup) {
         if (r == null || theme == null) {
             return false;
         }
@@ -330,21 +366,78 @@ public final class ComboBox<T> extends BaseWidget {
                 }
             }
 
-            renderPopup(
-                r,
-                popupX,
-                popupY,
-                width,
-                popupMaxHeight,
-                itemHeight,
-                Theme.toArgb(theme.panelBg),
-                Theme.toArgb(theme.widgetHover),
-                textColor,
-                hoverIndex
-            );
+            int popupBg = Theme.toArgb(theme.panelBg);
+            int popupHover = Theme.toArgb(theme.widgetHover);
+            if (deferPopup && ctx != null) {
+                // Prefer the central overlay queue so the host only needs one end-of-frame render call.
+                hasDeferredPopup = false;
+                int fHoverIndex = hoverIndex;
+                int fTextColor = textColor;
+                ctx.overlay().add(rr -> renderPopup(
+                    rr,
+                    popupX,
+                    popupY,
+                    width,
+                    popupMaxHeight,
+                    itemHeight,
+                    popupBg,
+                    popupHover,
+                    fTextColor,
+                    fHoverIndex
+                ));
+            } else if (deferPopup) {
+                // Back-compat when no UiContext is available: caller can invoke renderDeferredPopup().
+                hasDeferredPopup = true;
+                deferredX = popupX;
+                deferredY = popupY;
+                deferredWidth = width;
+                deferredPopupMaxHeight = popupMaxHeight;
+                deferredItemHeight = itemHeight;
+                deferredBgColor = popupBg;
+                deferredHoverColor = popupHover;
+                deferredTextColor = textColor;
+                deferredHoverIndex = hoverIndex;
+            } else {
+                hasDeferredPopup = false;
+                renderPopup(
+                    r,
+                    popupX,
+                    popupY,
+                    width,
+                    popupMaxHeight,
+                    itemHeight,
+                    popupBg,
+                    popupHover,
+                    textColor,
+                    hoverIndex
+                );
+            }
+        } else {
+            hasDeferredPopup = false;
         }
 
         return changed;
+    }
+
+    /**
+     * Renders a previously deferred popup (see {@link #render(UiRenderer, UiContext, UiInput, Theme, int, int, int, int, int, int, boolean, boolean)}).
+     */
+    public void renderDeferredPopup(UiRenderer r) {
+        if (!open || !hasDeferredPopup || r == null) {
+            return;
+        }
+        renderPopup(
+            r,
+            deferredX,
+            deferredY,
+            deferredWidth,
+            deferredPopupMaxHeight,
+            deferredItemHeight,
+            deferredBgColor,
+            deferredHoverColor,
+            deferredTextColor,
+            deferredHoverIndex
+        );
     }
 
     private int filteredIndexForHighlighted(List<T> filtered) {

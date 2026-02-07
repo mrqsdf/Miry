@@ -869,14 +869,23 @@ public final class NodeGraph {
     }
 
     private void bringSelectionToFront() {
-        for (int i = 0; i < nodes.size(); i++) {
-            GraphNode n = nodes.get(i);
+        if (nodes.isEmpty()) {
+            return;
+        }
+
+        List<GraphNode> unselected = new ArrayList<>(nodes.size());
+        List<GraphNode> selected = new ArrayList<>();
+        for (GraphNode n : nodes) {
             if (n.selected()) {
-                nodes.remove(i);
-                nodes.add(n);
-                i--;
+                selected.add(n);
+            } else {
+                unselected.add(n);
             }
         }
+
+        nodes.clear();
+        nodes.addAll(unselected);
+        nodes.addAll(selected);
     }
 
     private Minimap computeMinimap(int viewX, int viewY, int viewW, int viewH) {
