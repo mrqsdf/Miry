@@ -54,7 +54,11 @@ public final class TextRenderer {
                 float v0 = (g.atlasY() + insetY) * invH;
                 float u1 = (g.atlasX() + g.atlasWidth() - insetX) * invW;
                 float v1 = (g.atlasY() + g.atlasHeight() - insetY) * invH;
-                renderer.drawTexturedRect(atlas.texture(), gx, gy, g.renderWidth(), g.renderHeight(), u0, v0, u1, v1, argb);
+                if (atlas.isSdf()) {
+                    renderer.drawSdfTexturedRect(atlas.texture(), gx, gy, g.renderWidth(), g.renderHeight(), u0, v0, u1, v1, argb);
+                } else {
+                    renderer.drawCoverageTexturedRect(atlas.texture(), gx, gy, g.renderWidth(), g.renderHeight(), u0, v0, u1, v1, argb);
+                }
             }
 
             cursorX += g.advanceX();

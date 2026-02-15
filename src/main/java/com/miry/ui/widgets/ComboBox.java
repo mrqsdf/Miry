@@ -126,9 +126,38 @@ public final class ComboBox<T> extends BaseWidget {
     }
 
     public void renderPopup(UiRenderer r, int x, int y, int width, int maxHeight, int itemHeight, int bgColor, int hoverColor, int textColor, int hoverIndex) {
+        renderPopup(r, null, x, y, width, maxHeight, itemHeight, bgColor, hoverColor, textColor, hoverIndex);
+    }
+
+    private void renderPopup(UiRenderer r,
+                             Theme theme,
+                             int x,
+                             int y,
+                             int width,
+                             int maxHeight,
+                             int itemHeight,
+                             int bgColor,
+                             int hoverColor,
+                             int textColor,
+                             int hoverIndex) {
         List<T> filtered = filteredItems();
         int popupHeight = Math.min(filtered.size() * itemHeight, maxHeight);
-        r.drawRect(x, y, width, popupHeight, bgColor);
+        if (theme != null) {
+            int shadow = Theme.toArgb(theme.shadow);
+            drawDropShadow(r, x, y, width, popupHeight, shadow, 0.0f, theme.design.space_xs, theme.design.shadow_md, theme.design.radius_sm, 1.0f);
+            int outline = Theme.toArgb(theme.widgetOutline);
+            if (theme.skins.popup != null) {
+                theme.skins.popup.drawWithOutline(r, x, y, width, popupHeight, bgColor, outline, theme.design.border_thin);
+            } else {
+                int t = theme.design.border_thin;
+                float radius = theme.design.radius_sm;
+                int top = Theme.lightenArgb(bgColor, 0.02f);
+                int bottom = Theme.darkenArgb(bgColor, 0.02f);
+                r.drawRoundedRect(x, y, width, popupHeight, radius, top, top, bottom, bottom, t, outline);
+            }
+        } else {
+            r.drawRect(x, y, width, popupHeight, bgColor);
+        }
 
         for (int i = 0; i < filtered.size(); i++) {
             int itemY = y + i * itemHeight;
@@ -136,7 +165,8 @@ public final class ComboBox<T> extends BaseWidget {
                 r.drawRect(x, itemY, width, itemHeight, hoverColor);
             }
             float baselineY = r.baselineForBox(itemY, itemHeight);
-            r.drawText(filtered.get(i).toString(), x + 8, baselineY, textColor);
+            int pad = theme != null ? theme.design.space_sm : 8;
+            r.drawText(filtered.get(i).toString(), x + pad, baselineY, textColor);
         }
     }
 
@@ -321,31 +351,37 @@ public final class ComboBox<T> extends BaseWidget {
             ignorePopupPressThisFrame = true;
         }
 
-        int bg = enabled()
-            ? Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT())
-            : Theme.toArgb(theme.disabledBg);
-        if (enabled() && pressT() > 0.001f) {
-            bg = Theme.lerpArgb(theme.widgetHover, theme.widgetActive, pressT() * 0.18f);
+        int bg = enabled() ? computeStateColor(theme) : Theme.toArgb(theme.disabledBg);
+        int outline = enabled() ? computeBorderColor(theme) : Theme.toArgb(theme.widgetOutline);
+        if (enabled() && isOpen()) {
+            outline = Theme.toArgb(theme.widgetActive);
         }
-        int outline = Theme.toArgb((isFocused(ctx) || isOpen()) ? theme.widgetActive : theme.widgetOutline);
-        int textColor = enabled() ? Theme.toArgb(theme.text) : Theme.toArgb(theme.disabledFg);
+        int textColor = enabled() ? computeTextColor(theme) : Theme.toArgb(theme.disabledFg);
 
         if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, x, y, width, height, bg, outline, 1);
+            theme.skins.widget.drawWithOutline(r, x, y, width, height, bg, outline, theme.design.border_thin);
         } else {
-            r.drawRect(x, y, width, height, bg);
-            drawOutline(r, x, y, width, height, 1, outline);
+            int t = theme.design.border_thin;
+            float radius = theme.design.radius_sm;
+            int top = Theme.lightenArgb(bg, 0.06f);
+            int bottom = Theme.darkenArgb(bg, 0.06f);
+            r.drawRoundedRect(x, y, width, height, radius, top, top, bottom, bottom, t, outline);
         }
         if (enabled() && !pressed) {
-            r.drawRect(x + 1, y + 1, width - 2, 1, 0x22000000);
+            int t = theme.design.border_thin;
+            int hl = Theme.lightenArgb(bg, 0.12f);
+            int a = (int) (((hl >>> 24) & 0xFF) * 0.20f);
+            r.drawRect(x + t, y + t, width - t * 2, t, (a << 24) | (hl & 0x00FFFFFF));
         }
         drawFocusRing(r, theme, x, y, width, height);
 
         String label = selected() != null ? selected().toString() : "<None>";
         float baselineY = r.baselineForBox(y, height);
-        r.drawText(label, x + 8, baselineY, textColor);
-        float iconSize = Math.min(18.0f, height - 8.0f);
-        theme.icons.draw(r, Icon.CHEVRON_DOWN, x + width - iconSize - 6.0f, y + (height - iconSize) * 0.5f, iconSize, textColor);
+        int pad = theme.design.space_sm;
+        r.drawText(label, x + pad, baselineY, textColor);
+        float iconSize = Math.min(theme.design.icon_sm, height - theme.design.space_sm);
+        Icon icon = isOpen() ? Icon.CHEVRON_UP : Icon.CHEVRON_DOWN;
+        theme.icons.draw(r, icon, x + width - iconSize - theme.design.space_sm, y + (height - iconSize) * 0.5f, iconSize, textColor);
 
         boolean changed = false;
         if (isOpen()) {
@@ -375,6 +411,7 @@ public final class ComboBox<T> extends BaseWidget {
                 int fTextColor = textColor;
                 ctx.overlay().add(rr -> renderPopup(
                     rr,
+                    theme,
                     popupX,
                     popupY,
                     width,
@@ -401,6 +438,7 @@ public final class ComboBox<T> extends BaseWidget {
                 hasDeferredPopup = false;
                 renderPopup(
                     r,
+                    theme,
                     popupX,
                     popupY,
                     width,

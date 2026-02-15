@@ -10,7 +10,16 @@ import org.joml.Vector4f;
  * - Tokens are centralized in {@link StyleTokens} for consistent spacing/radius/motion.
  */
 public final class Theme {
-    public final StyleTokens tokens = new StyleTokens();
+    // ===== NEW TOKEN SYSTEMS =====
+    /** Comprehensive design tokens (spacing, typography, radii, shadows, timing) */
+    public final DesignTokens design = new DesignTokens();
+    /** Raw color palette (gray scale, accent colors) */
+    public final ColorPalette palette = new ColorPalette();
+
+    // ===== LEGACY SYSTEMS (kept for backward compatibility) =====
+    /** @deprecated Use design tokens instead. Kept for backward compatibility. */
+    @Deprecated
+    public final StyleTokens tokens = new StyleTokens(design);
     public final IconAtlas icons = new IconAtlas();
     public final WidgetSkins skins = new WidgetSkins();
 
@@ -32,6 +41,9 @@ public final class Theme {
 
     public final Vector4f shadow = rgba(0, 0, 0, 120);
     public final Vector4f focusRing = rgba(76, 154, 255, 255);
+
+    public final Vector4f accent = rgba(76, 154, 255, 255);
+    public final Vector4f danger = rgba(220, 80, 80, 255);
 
     private ThemeMode mode = ThemeMode.DARK;
 
@@ -65,45 +77,49 @@ public final class Theme {
     }
 
     private void applyDark() {
-        windowBg.set(rgba(18, 18, 22, 255));
-        panelBg.set(rgba(28, 28, 34, 255));
-        headerBg.set(rgba(20, 20, 24, 255));
-        headerLine.set(rgba(46, 46, 56, 255));
+        // Blender-inspired dark defaults: darker inputs, subtle borders, and a muted blue selection.
+        windowBg.set(ColorPalette.rgb(29, 29, 29));   // #1d1d1d
+        panelBg.set(ColorPalette.rgb(43, 43, 43));    // #2b2b2b
+        headerBg.set(ColorPalette.rgb(29, 29, 29));   // #1d1d1d
+        headerLine.set(ColorPalette.rgb(17, 17, 17)); // #111111
 
-        widgetBg.set(rgba(34, 34, 42, 255));
-        widgetHover.set(rgba(54, 54, 66, 255));
-        widgetActive.set(rgba(76, 154, 255, 255));
-        widgetOutline.set(rgba(55, 55, 66, 255));
+        widgetBg.set(ColorPalette.rgb(29, 29, 29));     // #1d1d1d (inputs)
+        widgetHover.set(ColorPalette.rgb(38, 38, 38));  // #262626
+        widgetActive.set(ColorPalette.rgb(71, 114, 179)); // #4772b3
+        widgetOutline.set(ColorPalette.rgb(17, 17, 17));  // #111111
 
-        text.set(rgba(230, 230, 240, 255));
-        textMuted.set(rgba(175, 175, 190, 255));
+        text.set(ColorPalette.rgb(230, 230, 230));       // #e6e6e6
+        textMuted.set(ColorPalette.rgb(141, 141, 141));  // #8d8d8d
 
-        disabledFg.set(rgba(135, 135, 150, 255));
-        disabledBg.set(rgba(26, 26, 32, 255));
+        disabledFg.set(ColorPalette.rgba(230, 230, 230, 110));
+        disabledBg.set(ColorPalette.rgb(34, 34, 34));
 
-        shadow.set(rgba(0, 0, 0, 120));
-        focusRing.set(rgba(76, 154, 255, 255));
+        shadow.set(ColorPalette.rgba(0, 0, 0, 90));
+        focusRing.set(ColorPalette.rgba(71, 114, 179, 204));
+        accent.set(ColorPalette.rgb(71, 114, 179));
+        danger.set(ColorPalette.rgb(220, 80, 80));
     }
 
     private void applyLight() {
-        windowBg.set(rgba(245, 245, 248, 255));
-        panelBg.set(rgba(255, 255, 255, 255));
-        headerBg.set(rgba(242, 242, 246, 255));
-        headerLine.set(rgba(220, 220, 228, 255));
+        // Simple modern light palette (not yet tuned to match Godot perfectly).
+        windowBg.set(palette.gray100);
+        panelBg.set(palette.white);
+        headerBg.set(palette.gray50);
+        headerLine.set(ColorPalette.rgba(0, 0, 0, 40));
 
-        widgetBg.set(rgba(244, 244, 248, 255));
-        widgetHover.set(rgba(232, 232, 240, 255));
-        widgetActive.set(rgba(50, 120, 255, 255));
-        widgetOutline.set(rgba(210, 210, 222, 255));
+        widgetBg.set(palette.gray50);
+        widgetHover.set(palette.gray200);
+        widgetActive.set(ColorPalette.rgb(46, 124, 235));
+        widgetOutline.set(palette.gray300);
 
-        text.set(rgba(22, 22, 26, 255));
-        textMuted.set(rgba(90, 90, 102, 255));
+        text.set(palette.gray900);
+        textMuted.set(palette.gray600);
 
-        disabledFg.set(rgba(130, 130, 140, 255));
-        disabledBg.set(rgba(236, 236, 242, 255));
+        disabledFg.set(palette.gray500);
+        disabledBg.set(palette.gray100);
 
-        shadow.set(rgba(0, 0, 0, 55));
-        focusRing.set(rgba(50, 120, 255, 255));
+        shadow.set(ColorPalette.rgba(0, 0, 0, 38));
+        focusRing.set(ColorPalette.rgba(46, 124, 235, 204));
     }
 
     public static Vector4f rgba(int r, int g, int b, int a) {
@@ -121,6 +137,43 @@ public final class Theme {
     public static int lerpArgb(Vector4f a, Vector4f b, float t) {
         float tt = clamp01(t);
         return toArgb(new Vector4f(a).lerp(b, tt));
+    }
+
+    public static int lerpArgbInt(int argbA, int argbB, float t) {
+        float tt = clamp01(t);
+        int aA = (argbA >>> 24) & 0xFF;
+        int rA = (argbA >>> 16) & 0xFF;
+        int gA = (argbA >>> 8) & 0xFF;
+        int bA = argbA & 0xFF;
+
+        int aB = (argbB >>> 24) & 0xFF;
+        int rB = (argbB >>> 16) & 0xFF;
+        int gB = (argbB >>> 8) & 0xFF;
+        int bB = argbB & 0xFF;
+
+        int a = clamp255(Math.round(aA + (aB - aA) * tt));
+        int r = clamp255(Math.round(rA + (rB - rA) * tt));
+        int g = clamp255(Math.round(gA + (gB - gA) * tt));
+        int b = clamp255(Math.round(bA + (bB - bA) * tt));
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    public static int lightenArgb(int argb, float amount) {
+        return lerpArgbInt(argb, 0xFFFFFFFF, amount);
+    }
+
+    public static int darkenArgb(int argb, float amount) {
+        return lerpArgbInt(argb, 0xFF000000, amount);
+    }
+
+    /**
+     * Multiplies the alpha channel of an ARGB color by {@code alphaMul}.
+     */
+    public static int mulAlpha(int argb, float alphaMul) {
+        float m = clamp01(alphaMul);
+        int a = (argb >>> 24) & 0xFF;
+        int na = clamp255(Math.round(a * m));
+        return (na << 24) | (argb & 0x00FFFFFF);
     }
 
     private static float clamp01(float v) {

@@ -75,14 +75,17 @@ public final class ColorPicker extends BaseWidget {
         int textColor = enabled() ? Theme.toArgb(theme.text) : Theme.toArgb(theme.disabledFg);
 
         if (theme.skins.panel != null) {
-            theme.skins.panel.drawWithOutline(r, x, y, width, height, bg, outline, 1);
+            theme.skins.panel.drawWithOutline(r, x, y, width, height, bg, outline, theme.design.border_thin);
         } else {
-            r.drawRect(x, y, width, height, bg);
-            drawOutline(r, x, y, width, height, 1, outline);
+            int t = theme.design.border_thin;
+            float radius = theme.design.radius_sm;
+            int top = Theme.lightenArgb(bg, 0.02f);
+            int bottom = Theme.darkenArgb(bg, 0.02f);
+            r.drawRoundedRect(x, y, width, height, radius, top, top, bottom, bottom, t, outline);
         }
 
         boolean canInteract = enabled() && interactive;
-        boolean changed = render(r, canInteract ? input : null, x, y, width, height, textColor);
+        boolean changed = renderInternal(r, canInteract ? input : null, theme, x, y, width, height, textColor);
 
         if (!canInteract) {
             r.drawRect(x, y, width, height, 0x55000000);
@@ -92,21 +95,41 @@ public final class ColorPicker extends BaseWidget {
     }
 
     public boolean render(UiRenderer r, UiInput input, int x, int y, int width, int height, int textColor) {
+        return renderInternal(r, input, null, x, y, width, height, textColor);
+    }
+
+    private boolean renderInternal(UiRenderer r, UiInput input, Theme theme, int x, int y, int width, int height, int textColor) {
         if (width <= 0 || height <= 0) {
             return false;
         }
 
-        int pad = 12;
-        int rightColWidth = Math.min(190, Math.max(120, width / 3));
+        int pad = theme != null ? theme.design.space_md : 12;
+        int spaceXs = theme != null ? theme.design.space_xs : 4;
+        int spaceSm = theme != null ? theme.design.space_sm : 8;
+        int spaceMd = theme != null ? theme.design.space_md : 12;
+        int spaceLg = theme != null ? theme.design.space_lg : 16;
+        int space2xl = theme != null ? theme.design.space_2xl : 32;
+        int previewH = theme != null ? theme.design.widget_height_xl : 40;
+        int sliderH = theme != null ? theme.design.icon_sm : 16;
+
+        int outline = theme != null ? Theme.toArgb(theme.widgetOutline) : 0xFF3A3A42;
+        int knobShadow = theme != null ? Theme.toArgb(theme.headerBg) : 0xFF0D0D10;
+        float sliderRadius = theme != null ? theme.design.radius_sm : 3.0f;
+
+        int rightColMinW = theme != null ? (space2xl * 3 + spaceLg + spaceSm) : 120;
+        int rightColMaxW = theme != null ? (space2xl * 5 + spaceLg + spaceSm + spaceXs + theme.design.border_medium) : 190;
+        int rightColWidth = Math.min(rightColMaxW, Math.max(rightColMinW, width / 3));
         int wheelSize = Math.min(height - pad * 2, width - rightColWidth - pad * 3);
 
-        boolean stacked = wheelSize < 160;
+        boolean stacked = wheelSize < (space2xl * 5);
         if (stacked) {
             rightColWidth = width - pad * 2;
-            wheelSize = Math.min(width - pad * 2, height - pad * 2 - 84);
+            int extra = previewH + sliderH * 2 + spaceMd;
+            wheelSize = Math.min(width - pad * 2, height - pad * 2 - extra);
         }
 
-        wheelSize = Math.max(64, wheelSize);
+        int minWheel = theme != null ? (theme.design.icon_xl * 2) : 64;
+        wheelSize = Math.max(minWheel, wheelSize);
         wheelSize = wheelSize & ~1; // keep even so radius is integer
         int radius = wheelSize / 2;
 
@@ -118,25 +141,24 @@ public final class ColorPicker extends BaseWidget {
         int colX = stacked ? x + pad : wheelX + wheelSize + pad;
         int colY = wheelY;
 
-        float baseline = r.baselineForBox(colY, 18);
+        int labelBoxH = theme != null ? (spaceLg + spaceXs) : 18;
+        float baseline = r.baselineForBox(colY, labelBoxH);
         r.drawText("Preview", colX, baseline, textColor);
 
-        int previewY = colY + 22;
+        int previewY = colY + labelBoxH + spaceXs;
         int previewW = rightColWidth;
-        int previewH = 40;
 
-        int valueSliderY = previewY + previewH + 18;
+        int valueSliderY = previewY + previewH + spaceMd;
         int sliderW = rightColWidth;
-        int sliderH = 16;
-        int alphaSliderY = valueSliderY + sliderH + 16;
+        int alphaSliderY = valueSliderY + sliderH + spaceMd;
 
         if (stacked) {
-            colY = wheelY + wheelSize + 14;
-            baseline = r.baselineForBox(colY, 18);
+            colY = wheelY + wheelSize + spaceMd;
+            baseline = r.baselineForBox(colY, labelBoxH);
             r.drawText("Preview", colX, baseline, textColor);
-            previewY = colY + 22;
-            valueSliderY = previewY + previewH + 18;
-            alphaSliderY = valueSliderY + sliderH + 16;
+            previewY = colY + labelBoxH + spaceXs;
+            valueSliderY = previewY + previewH + spaceMd;
+            alphaSliderY = valueSliderY + sliderH + spaceMd;
         }
 
         boolean changed = handleInput(input, wheelCx, wheelCy, radius,
@@ -153,65 +175,75 @@ public final class ColorPicker extends BaseWidget {
         float angle = hue * TAU;
         float ix = wheelCx + (float) Math.cos(angle) * saturation * radius;
         float iy = wheelCy + (float) Math.sin(angle) * saturation * radius;
-        r.drawRect(ix - 5, iy - 5, 10, 10, 0xFF0D0D10);
-        r.drawRect(ix - 4, iy - 4, 8, 8, 0xFFFFFFFF);
-        r.drawRect(ix - 3, iy - 3, 6, 6, 0xFF0D0D10);
+        int ringSize = theme != null ? (spaceSm + theme.design.border_medium) : 10;
+        float ringOuter = ringSize * 0.5f;
+        float ringInner = Math.max(2.0f, ringOuter - (theme != null ? theme.design.border_medium : 2));
+        r.drawCircle(ix, iy, ringOuter, 0xFFFFFFFF, 2.0f, knobShadow);
+        r.drawCircle(ix, iy, ringInner, knobShadow);
 
         // Preview + hex
         int argb = toArgb();
         r.drawRect(colX, previewY, previewW, previewH, argb);
         String hex = String.format("#%08X", argb);
-        float hexBaseline = r.baselineForBox(previewY + previewH + 2, 16);
+        int hexBoxH = sliderH;
+        float hexBaseline = r.baselineForBox(previewY + previewH + borderThin(theme) * 2, hexBoxH);
         r.drawText(hex, colX, hexBaseline, textColor);
 
         // Value slider: black -> full color for current hue/sat (v=1)
         float[] fullRgb = hsvToRgb(hue, saturation, 1.0f);
-        for (int i = 0; i < sliderW; i++) {
-            float t = sliderW <= 1 ? 0.0f : (i / (float) (sliderW - 1));
-            int rr = Math.round(fullRgb[0] * 255.0f * t);
-            int gg = Math.round(fullRgb[1] * 255.0f * t);
-            int bb = Math.round(fullRgb[2] * 255.0f * t);
-            int c = (0xFF << 24) | (rr << 16) | (gg << 8) | bb;
-            r.drawRect(colX + i, valueSliderY, 1, sliderH, c);
-        }
-        r.drawRect(colX, valueSliderY, sliderW, 1, 0xFF3A3A42);
-        r.drawRect(colX, valueSliderY + sliderH - 1, sliderW, 1, 0xFF3A3A42);
+        int full = (0xFF << 24)
+            | (Math.round(fullRgb[0] * 255.0f) << 16)
+            | (Math.round(fullRgb[1] * 255.0f) << 8)
+            | Math.round(fullRgb[2] * 255.0f);
+        r.drawRoundedRect(colX, valueSliderY, sliderW, sliderH, sliderRadius,
+            0xFF000000, full, full, 0xFF000000,
+            borderThin(theme), outline);
         int handleX = colX + Math.round(value * (sliderW - 1));
-        r.drawRect(handleX - 2, valueSliderY - 2, 4, sliderH + 4, 0xFF0D0D10);
-        r.drawRect(handleX - 1, valueSliderY - 1, 2, sliderH + 2, 0xFFFFFFFF);
+        int handleW = theme != null ? theme.design.border_medium : 2;
+        int handlePad = theme != null ? theme.design.border_medium : 2;
+        float handleR = Math.min(sliderRadius, sliderH * 0.5f);
+        r.drawRoundedRect(handleX - handleW - handlePad, valueSliderY - handlePad, handleW * 2 + handlePad * 2, sliderH + handlePad * 2, handleR, knobShadow);
+        r.drawRoundedRect(handleX - handleW, valueSliderY, handleW * 2, sliderH, handleR, 0xFFFFFFFF, 1.0f, knobShadow);
 
-        float vLabelBaseline = r.baselineForBox(valueSliderY - 16, 14);
+        float vLabelBaseline = r.baselineForBox(valueSliderY - labelBoxH, labelBoxH);
         r.drawText("Value", colX, vLabelBaseline, textColor);
 
         // Alpha slider with checkerboard background
-        int checkSize = 8;
-        int light = 0xFF3A3A42;
-        int dark = 0xFF24242A;
-        for (int yy = 0; yy < sliderH; yy += checkSize) {
-            for (int xx = 0; xx < sliderW; xx += checkSize) {
+        int checkSize = spaceSm;
+        int light = outline;
+        int dark = theme != null ? Theme.lerpArgb(theme.widgetOutline, theme.panelBg, 0.45f) : 0xFF24242A;
+        int inset = Math.max(0, Math.round(sliderRadius));
+        int cbX = colX + inset;
+        int cbY = alphaSliderY + inset;
+        int cbW = Math.max(0, sliderW - inset * 2);
+        int cbH = Math.max(0, sliderH - inset * 2);
+        for (int yy = 0; yy < cbH; yy += checkSize) {
+            for (int xx = 0; xx < cbW; xx += checkSize) {
                 boolean a = ((xx / checkSize) + (yy / checkSize)) % 2 == 0;
-                r.drawRect(colX + xx, alphaSliderY + yy,
-                    Math.min(checkSize, sliderW - xx), Math.min(checkSize, sliderH - yy),
+                r.drawRect(cbX + xx, cbY + yy,
+                    Math.min(checkSize, cbW - xx), Math.min(checkSize, cbH - yy),
                     a ? light : dark);
             }
         }
         int rgbNoAlpha = argb & 0x00FFFFFF;
-        for (int i = 0; i < sliderW; i++) {
-            float t = sliderW <= 1 ? 0.0f : (i / (float) (sliderW - 1));
-            int aa = Math.round(t * 255.0f);
-            r.drawRect(colX + i, alphaSliderY, 1, sliderH, (aa << 24) | rgbNoAlpha);
-        }
-        r.drawRect(colX, alphaSliderY, sliderW, 1, 0xFF3A3A42);
-        r.drawRect(colX, alphaSliderY + sliderH - 1, sliderW, 1, 0xFF3A3A42);
+        int left = rgbNoAlpha; // alpha 0
+        int right = (0xFF << 24) | rgbNoAlpha;
+        r.drawRoundedRect(colX, alphaSliderY, sliderW, sliderH, sliderRadius,
+            left, right, right, left,
+            borderThin(theme), outline);
 
         int aHandleX = colX + Math.round(alpha * (sliderW - 1));
-        r.drawRect(aHandleX - 2, alphaSliderY - 2, 4, sliderH + 4, 0xFF0D0D10);
-        r.drawRect(aHandleX - 1, alphaSliderY - 1, 2, sliderH + 2, 0xFFFFFFFF);
+        r.drawRoundedRect(aHandleX - handleW - handlePad, alphaSliderY - handlePad, handleW * 2 + handlePad * 2, sliderH + handlePad * 2, handleR, knobShadow);
+        r.drawRoundedRect(aHandleX - handleW, alphaSliderY, handleW * 2, sliderH, handleR, 0xFFFFFFFF, 1.0f, knobShadow);
 
-        float aLabelBaseline = r.baselineForBox(alphaSliderY - 16, 14);
+        float aLabelBaseline = r.baselineForBox(alphaSliderY - labelBoxH, labelBoxH);
         r.drawText("Alpha", colX, aLabelBaseline, textColor);
 
         return changed;
+    }
+
+    private static int borderThin(Theme theme) {
+        return theme != null ? theme.design.border_thin : 1;
     }
 
     public void close() {

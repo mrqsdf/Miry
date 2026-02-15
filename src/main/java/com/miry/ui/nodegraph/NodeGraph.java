@@ -369,11 +369,12 @@ public final class NodeGraph {
 
         // Zoom around cursor.
         if (inside && input.scrollY() != 0.0) {
+            double wheel = input.consumeScrollY();
             float oldZoom = zoom;
             float worldX = screenToWorldX(mx, viewX, oldZoom);
             float worldY = screenToWorldY(my, viewY, oldZoom);
 
-            float factor = (float) Math.pow(1.12, input.scrollY());
+            float factor = (float) Math.pow(1.12, wheel);
             setZoom(oldZoom * factor);
 
             panX = (mx - viewX) / zoom - worldX;
@@ -602,10 +603,10 @@ public final class NodeGraph {
         float sw = node.width() * zoom;
         float sh = node.height() * zoom;
 
-        float headerH = Math.max(22.0f, 28.0f * zoom);
-        float pinStartY = sy + headerH + Math.max(14.0f, 18.0f * zoom);
-        float pinStepY = Math.max(18.0f, 22.0f * zoom);
-        float pinInset = Math.max(6.0f, 10.0f * zoom);
+        float headerH = Math.max(12.0f, 28.0f * zoom);
+        float pinStartY = sy + headerH + Math.max(6.0f, 18.0f * zoom);
+        float pinStepY = Math.max(10.0f, 22.0f * zoom);
+        float pinInset = Math.max(2.0f, 10.0f * zoom);
         float inX = sx + pinInset;
         float outX = sx + sw - pinInset;
 
@@ -626,47 +627,89 @@ public final class NodeGraph {
         float sh = node.height() * zoom;
 
         boolean hovered = node == hoveredNode;
-        int shadow = 0x2A000000;
-        r.drawRect(sx + 3, sy + 3, sw, sh, shadow);
+        float radius = clamp(2.0f, 4.0f * zoom, 6.0f);
+        int shadow = 0x24000000;
+        r.drawRoundedRect(sx + 3, sy + 3, sw, sh, radius, shadow);
 
         int bgColor = node.selected() ? 0xFF2F2F38 : 0xFF26262D;
         int outline = node.selected() ? 0xFF4C9AFF : (hovered ? 0xFF5A5A66 : 0xFF3A3A42);
-        float headerH = Math.max(22.0f, 28.0f * zoom);
+        float headerH = Math.max(12.0f, 28.0f * zoom);
 
-        r.drawRect(sx, sy, sw, sh, bgColor);
-        r.drawRect(sx, sy, sw, headerH, 0xFF2B2B34);
-        r.drawRect(sx, sy, sw, 1, outline);
-        r.drawRect(sx, sy + sh - 1, sw, 1, outline);
-        r.drawRect(sx, sy, 1, sh, outline);
-        r.drawRect(sx + sw - 1, sy, 1, sh, outline);
+        r.drawRoundedRect(sx, sy, sw, sh, radius, bgColor);
+        int headerColor = 0xFF2B2B34;
+        int hx = Math.round(sx);
+        int hy = Math.round(sy);
+        int hw = Math.max(0, Math.round(sw));
+        int hh = Math.max(0, Math.round(headerH));
+        if (hw > 0 && hh > 0) {
+            r.flush();
+            r.pushClip(hx, hy, hw, hh);
+            r.drawRoundedRect(sx, sy, sw, sh, radius, headerColor);
+            r.flush();
+            r.popClip();
+        }
+        r.drawRoundedRect(sx, sy, sw, sh, radius, 0x00000000, 1.0f, outline);
 
-        float titleBaseline = r.baselineForBox(sy, headerH);
-        r.drawText(node.title(), sx + 10, titleBaseline, 0xFFE6E6F0);
+        float lineH = r.lineHeight();
+        boolean showTitle = headerH >= (lineH - 1.0f) && sw >= 46.0f;
+
+        int clipX = Math.round(sx + 1.0f);
+        int clipY = Math.round(sy + 1.0f);
+        int clipW = Math.max(0, Math.round(sw - 2.0f));
+        int clipH = Math.max(0, Math.round(sh - 2.0f));
+        boolean pushedClip = false;
+        if (clipW > 0 && clipH > 0) {
+            r.flush();
+            r.pushClip(clipX, clipY, clipW, clipH);
+            pushedClip = true;
+        }
+
+        float textAlphaT = clamp01((zoom - 0.55f) / 0.35f);
+        int titleColor = withAlpha(0xFFE6E6F0, (int) Math.round(255.0f * textAlphaT));
+        int labelColor = withAlpha(0xFFD0D0DA, (int) Math.round(255.0f * textAlphaT));
+        float titleInset = Math.max(4.0f, 10.0f * zoom);
+        float textGap = Math.max(2.0f, 6.0f * zoom);
+
+        if (showTitle) {
+            float titleBaseline = r.baselineForBox(sy, headerH);
+            float avail = Math.max(0.0f, sw - titleInset * 2.0f);
+            String title = truncateToWidth(r, node.title(), avail);
+            r.drawText(title, sx + titleInset, titleBaseline, titleColor);
+        }
 
         float pinSize = clamp(8.0f, 12.0f * zoom, 14.0f);
         float half = pinSize * 0.5f;
-        float rowH = Math.max(18.0f, 22.0f * zoom);
+        float rowH = Math.max(10.0f, 22.0f * zoom);
+        boolean showPinLabels = rowH >= (lineH - 1.0f) && sw >= 70.0f;
         for (NodePin pin : node.inputs()) {
             int base = pinColor(pin);
             int c = pin == hoveredPin ? 0xFFFFFFFF : base;
-            r.drawRect(pin.x() - half - 1, pin.y() - half - 1, pinSize + 2, pinSize + 2, 0xFF0D0D10);
-            r.drawRect(pin.x() - half, pin.y() - half, pinSize, pinSize, c);
+            r.drawCircle(pin.x(), pin.y(), half, c, 1.0f, 0xFF0D0D10);
 
-            float top = pin.y() - rowH * 0.5f;
-            float baseline = r.baselineForBox(top, rowH);
-            r.drawText(pin.name(), pin.x() + half + 6, baseline, 0xFFD0D0DA);
+            if (showPinLabels) {
+                float top = pin.y() - rowH * 0.5f;
+                float baseline = r.baselineForBox(top, rowH);
+                float x = pin.x() + half + textGap;
+                float maxW = Math.max(0.0f, (sx + sw) - x - titleInset);
+                String label = truncateToWidth(r, pin.name(), maxW);
+                r.drawText(label, x, baseline, labelColor);
+            }
         }
 
         for (NodePin pin : node.outputs()) {
             int base = pinColor(pin);
             int c = pin == hoveredPin ? 0xFFFFFFFF : base;
-            r.drawRect(pin.x() - half - 1, pin.y() - half - 1, pinSize + 2, pinSize + 2, 0xFF0D0D10);
-            r.drawRect(pin.x() - half, pin.y() - half, pinSize, pinSize, c);
+            r.drawCircle(pin.x(), pin.y(), half, c, 1.0f, 0xFF0D0D10);
 
-            float top = pin.y() - rowH * 0.5f;
-            float baseline = r.baselineForBox(top, rowH);
-            float textW = r.measureText(pin.name());
-            r.drawText(pin.name(), pin.x() - half - 6 - textW, baseline, 0xFFD0D0DA);
+            if (showPinLabels) {
+                float top = pin.y() - rowH * 0.5f;
+                float baseline = r.baselineForBox(top, rowH);
+                float right = pin.x() - half - textGap;
+                float maxW = Math.max(0.0f, right - (sx + titleInset));
+                String label = truncateToWidth(r, pin.name(), maxW);
+                float textW = r.measureText(label);
+                r.drawText(label, right - textW, baseline, labelColor);
+            }
         }
 
         if (node.previewTexture() != null && node.previewHeight() > 0) {
@@ -683,6 +726,49 @@ public final class NodeGraph {
             r.drawRect(px, py, 1, ph, 0x663A3A42);
             r.drawRect(px + pw - 1, py, 1, ph, 0x663A3A42);
         }
+
+        if (pushedClip) {
+            r.flush();
+            r.popClip();
+        }
+    }
+
+    private static String truncateToWidth(UiRenderer r, String text, float maxWidth) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        if (maxWidth <= 0.0f) {
+            return "";
+        }
+        if (r.measureText(text) <= maxWidth) {
+            return text;
+        }
+        String ellipsis = "…";
+        float ellW = r.measureText(ellipsis);
+        if (ellW >= maxWidth) {
+            return "";
+        }
+        int lo = 0;
+        int hi = text.length();
+        while (lo + 1 < hi) {
+            int mid = (lo + hi) >>> 1;
+            String s = text.substring(0, mid) + ellipsis;
+            if (r.measureText(s) <= maxWidth) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        return text.substring(0, lo) + ellipsis;
+    }
+
+    private static float clamp01(float v) {
+        return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+    }
+
+    private static int withAlpha(int argb, int a) {
+        int aa = a < 0 ? 0 : Math.min(255, a);
+        return (aa << 24) | (argb & 0x00FFFFFF);
     }
 
     private void renderConnection(UiRenderer r, NodeConnection conn, int color, float thicknessMul) {
@@ -697,17 +783,12 @@ public final class NodeGraph {
 
     private void renderBezier(UiRenderer r, float x0, float y0, float cx0, float cy0, float cx1, float cy1, float x1, float y1, float thickness, int color) {
         int segments = 34;
-        float half = thickness * 0.5f;
-        float[] prev = null;
-        for (int i = 0; i <= segments; i++) {
+        float radius = thickness * 0.5f;
+        float[] prev = bezier(x0, y0, cx0, cy0, cx1, cy1, x1, y1, 0.0f);
+        for (int i = 1; i <= segments; i++) {
             float t = i / (float) segments;
             float[] p = bezier(x0, y0, cx0, cy0, cx1, cy1, x1, y1, t);
-            r.drawRect(p[0] - half, p[1] - half, thickness, thickness, color);
-            if (prev != null) {
-                float mx = (prev[0] + p[0]) * 0.5f;
-                float my = (prev[1] + p[1]) * 0.5f;
-                r.drawRect(mx - half, my - half, thickness, thickness, color);
-            }
+            r.drawCapsule(prev[0], prev[1], p[0], p[1], radius, color);
             prev = p;
         }
     }
@@ -1703,7 +1784,7 @@ public final class NodeGraph {
         return (oa << 24) | (or << 16) | (og << 8) | ob;
     }
 
-    private static float clamp(float v, float min, float max) {
+    private static float clamp(float min, float v, float max) {
         return Math.max(min, Math.min(max, v));
     }
 

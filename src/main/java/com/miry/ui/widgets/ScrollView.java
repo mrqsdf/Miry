@@ -4,6 +4,7 @@ import com.miry.ui.core.BaseWidget;
 import com.miry.ui.UiContext;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
+import com.miry.ui.theme.Theme;
 
 /**
  * Scroll container state helper with interactive scrollbars.
@@ -24,10 +25,34 @@ public final class ScrollView extends BaseWidget {
     private boolean draggingHThumb;
     private float dragOffset;
 
+    private int scrollbarThicknessPx = 10;
+    private int thumbMinSizePx = 24;
+
     public ScrollView(int viewWidth, int viewHeight) {
         setFocusable(false);
         this.viewWidth = Math.max(1, viewWidth);
         this.viewHeight = Math.max(1, viewHeight);
+    }
+
+    /**
+     * Configures scrollbar sizing from design tokens.
+     * <p>
+     * This keeps the scrollbar math consistent between rendering and hit-testing.
+     */
+    public void configureFromTheme(Theme theme) {
+        if (theme == null) {
+            return;
+        }
+        scrollbarThicknessPx = theme.design.space_sm + theme.design.border_medium; // 8+2=10 default
+        thumbMinSizePx = theme.design.widget_height_sm; // 24 default
+    }
+
+    public void setScrollbarThicknessPx(int px) {
+        scrollbarThicknessPx = Math.max(4, px);
+    }
+
+    public void setThumbMinSizePx(int px) {
+        thumbMinSizePx = Math.max(4, px);
     }
 
     public void setContentSize(int width, int height) {
@@ -180,29 +205,34 @@ public final class ScrollView extends BaseWidget {
         float mx = input != null ? input.mousePos().x : -1;
         float my = input != null ? input.mousePos().y : -1;
 
+        float radius = scrollbarThicknessPx * 0.5f;
+        int inset = Math.max(1, scrollbarThicknessPx / 5);
+
         if (maxScrollY > 0) {
             Thumb v = verticalThumb(x, y, maxScrollY);
-            r.drawRect(v.trackX, v.trackY, v.trackW, v.trackH, trackColor);
+            r.drawRoundedRect(v.trackX, v.trackY, v.trackW, v.trackH, radius, trackColor);
             boolean hovered = v.hitThumb(mx, my) || draggingVThumb;
-            r.drawRect(v.thumbX, v.thumbY, v.thumbW, v.thumbH, hovered ? thumbHoverColor : thumbColor);
+            int tc = hovered ? thumbHoverColor : thumbColor;
+            r.drawRoundedRect(v.thumbX + inset, v.thumbY + inset, Math.max(1, v.thumbW - inset * 2), Math.max(1, v.thumbH - inset * 2), radius, tc);
         }
 
         if (maxScrollX > 0) {
             Thumb h = horizontalThumb(x, y, maxScrollX);
-            r.drawRect(h.trackX, h.trackY, h.trackW, h.trackH, trackColor);
+            r.drawRoundedRect(h.trackX, h.trackY, h.trackW, h.trackH, radius, trackColor);
             boolean hovered = h.hitThumb(mx, my) || draggingHThumb;
-            r.drawRect(h.thumbX, h.thumbY, h.thumbW, h.thumbH, hovered ? thumbHoverColor : thumbColor);
+            int tc = hovered ? thumbHoverColor : thumbColor;
+            r.drawRoundedRect(h.thumbX + inset, h.thumbY + inset, Math.max(1, h.thumbW - inset * 2), Math.max(1, h.thumbH - inset * 2), radius, tc);
         }
     }
 
     private Thumb verticalThumb(int x, int y, float maxScrollY) {
-        int barW = 10;
+        int barW = scrollbarThicknessPx;
         int trackX = x + viewWidth - barW;
         int trackY = y;
         int trackW = barW;
         int trackH = viewHeight;
 
-        int thumbH = Math.max(24, (int) ((float) viewHeight / Math.max(1, contentHeight) * viewHeight));
+        int thumbH = Math.max(thumbMinSizePx, (int) ((float) viewHeight / Math.max(1, contentHeight) * viewHeight));
         thumbH = Math.min(trackH, thumbH);
         int thumbY = (int) (scrollY / maxScrollY * (trackH - thumbH));
 
@@ -210,13 +240,13 @@ public final class ScrollView extends BaseWidget {
     }
 
     private Thumb horizontalThumb(int x, int y, float maxScrollX) {
-        int barH = 10;
+        int barH = scrollbarThicknessPx;
         int trackX = x;
         int trackY = y + viewHeight - barH;
         int trackW = viewWidth;
         int trackH = barH;
 
-        int thumbW = Math.max(24, (int) ((float) viewWidth / Math.max(1, contentWidth) * viewWidth));
+        int thumbW = Math.max(thumbMinSizePx, (int) ((float) viewWidth / Math.max(1, contentWidth) * viewWidth));
         thumbW = Math.min(trackW, thumbW);
         int thumbX = (int) (scrollX / maxScrollX * (trackW - thumbW));
 

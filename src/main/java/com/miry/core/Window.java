@@ -9,12 +9,16 @@ import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_CORE_PROFILE;
 import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_FORWARD_COMPAT;
 import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_PROFILE;
 import static org.lwjgl.glfw.GLFW.GLFW_RESIZABLE;
+import static org.lwjgl.glfw.GLFW.GLFW_SAMPLES;
 import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
+import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM;
+import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM_X11;
 import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
 import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
 import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
 import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
 import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwInitHint;
 import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
@@ -32,6 +36,8 @@ import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 import org.lwjgl.system.MemoryStack;
+import static org.lwjgl.opengl.GL11.glEnable;
+import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 
 /**
  * GLFW window wrapper used by the demo runtime.
@@ -51,6 +57,10 @@ public final class Window implements AutoCloseable {
     public Window(String title, int width, int height) {
         errorCallback = GLFWErrorCallback.createPrint(System.err);
         errorCallback.set();
+
+        // Force X11 platform on Linux to avoid Wayland issues with LWJGL 3.4+
+        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+
         if (!glfwInit()) {
             throw new IllegalStateException("GLFW init failed.");
         }
@@ -61,6 +71,7 @@ public final class Window implements AutoCloseable {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+        glfwWindowHint(GLFW_SAMPLES, 4);
 
         handle = glfwCreateWindow(width, height, title, 0, 0);
         if (handle == 0) {
@@ -70,6 +81,7 @@ public final class Window implements AutoCloseable {
 
         glfwMakeContextCurrent(handle);
         GL.createCapabilities();
+        glEnable(GL_MULTISAMPLE);
         glfwSwapInterval(1);
         glfwShowWindow(handle);
 
@@ -118,6 +130,18 @@ public final class Window implements AutoCloseable {
 
     public void pollEvents() {
         glfwPollEvents();
+    }
+
+    public void waitEvents() {
+        org.lwjgl.glfw.GLFW.glfwWaitEvents();
+    }
+
+    public void waitEvents(double timeout) {
+        org.lwjgl.glfw.GLFW.glfwWaitEventsTimeout(timeout);
+    }
+
+    public void wakeUp() {
+        org.lwjgl.glfw.GLFW.glfwPostEmptyEvent();
     }
 
     public void swapBuffers() {

@@ -13,9 +13,15 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Small immediate-mode UI helper used by the dock/layout demo panels.
+ * Immediate-mode UI (IMUI) helper for rapid prototyping and layout-driven panels.
  * <p>
- * This is separate from the retained widgets demonstrated in {@code com.miry.demo.ComprehensiveDemo}.
+ * This class provides a stateless, procedural API for drawing buttons, toggles, labels, and scroll areas.
+ * It is distinct from the retained-mode {@link com.miry.ui.widgets} package, although they share the same
+ * {@link Theme} and rendering backend.
+ * </p>
+ * <p>
+ * Ideal for debugging tools, inspector panels, and dynamic layouts where state management overhead is undesirable.
+ * </p>
  */
 public final class Ui {
     private final Theme theme;
@@ -40,6 +46,11 @@ public final class Ui {
     private final Deque<Integer> idSeedStack = new ArrayDeque<>();
     private final Deque<LayoutState> layoutStack = new ArrayDeque<>();
 
+    /**
+     * Creates a new UI context with the specified theme.
+     *
+     * @param theme The theme to use for styling widgets.
+     */
     public Ui(Theme theme) {
         this.theme = Objects.requireNonNull(theme, "theme");
     }
@@ -56,17 +67,38 @@ public final class Ui {
         return mouse;
     }
 
+    /**
+     * Prepares the UI for a new frame.
+     * <p>
+     * Must be called once per frame before any widget methods.
+     * </p>
+     *
+     * @param input The current input state.
+     * @param dt    The delta time since the last frame.
+     */
     public void beginFrame(UiInput input, float dt) {
         this.dt = Math.max(0.0f, dt);
         idSeed = 0x1234567;
         idSeedStack.clear();
         this.input.setMousePos(input.mousePos().x, input.mousePos().y)
                 .setMouseButtons(input.mouseDown(), input.mousePressed(), input.mouseReleased())
+                .setModifiers(input.ctrlDown(), input.shiftDown(), input.altDown(), input.superDown())
                 .setScrollY(input.scrollY());
         mouse.set(this.input.mousePos());
         hotId = 0;
     }
 
+    /**
+     * Begins a layout panel region.
+     * <p>
+     * Widgets drawn after this call will be positioned relative to the panel's content area.
+     * </p>
+     *
+     * @param x      The x-coordinate of the panel.
+     * @param y      The y-coordinate of the panel.
+     * @param width  The width of the panel.
+     * @param height The height of the panel.
+     */
     public void beginPanel(int x, int y, int width, int height) {
         layoutStack.clear();
         contentX = x + theme.tokens.padding;
@@ -76,27 +108,50 @@ public final class Ui {
         cursorY = contentY;
     }
 
+    /**
+     * Ends the current panel region.
+     */
     public void endPanel() {
         if (input.mouseReleased() && activeId != 0) {
             activeId = 0;
         }
     }
 
+    /**
+     * Pushes an integer ID to the ID stack to prevent hash collisions.
+     *
+     * @param value The value to mix into the current ID hash.
+     */
     public void pushId(int value) {
         idSeedStack.push(idSeed);
         idSeed = mix(idSeed, value);
     }
 
+    /**
+     * Pushes a string ID to the ID stack.
+     *
+     * @param value The string to hash and mix into the current ID.
+     */
     public void pushId(String value) {
         pushId(hash32(value == null ? "" : value));
     }
 
+    /**
+     * Pops the last ID from the ID stack.
+     */
     public void popId() {
         if (!idSeedStack.isEmpty()) {
             idSeed = idSeedStack.pop();
         }
     }
 
+    /**
+     * Draws a button widget.
+     *
+     * @param r     The renderer to use.
+     * @param label The text to display on the button.
+     * @return {@code true} if the button was clicked this frame.
+     */
     public boolean button(UiRenderer r, String label) {
         int id = id(label);
         Rect rect = nextRect(theme.tokens.itemHeight);
@@ -128,8 +183,9 @@ public final class Ui {
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
-            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
-            r.drawRect(rect.x, rect.y, rect.w, 1, outline);
+            float radius = theme.design.radius_sm;
+            int border = theme.design.border_thin;
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
         }
         float baselineY = r.baselineForBox(rect.y, rect.h);
         r.drawText(label, rect.x + 10, baselineY, Theme.toArgb(theme.text));
@@ -137,6 +193,14 @@ public final class Ui {
         return clicked;
     }
 
+    /**
+     * Draws a toggle switch / checkbox.
+     *
+     * @param r     The renderer to use.
+     * @param label The text label.
+     * @param value The current state of the toggle.
+     * @return The new state of the toggle (toggled if clicked).
+     */
     public boolean toggle(UiRenderer r, String label, boolean value) {
         int id = id(label);
         Rect rect = nextRect(theme.tokens.itemHeight);
@@ -161,23 +225,40 @@ public final class Ui {
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
-            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
+            float radius = theme.design.radius_sm;
+            int border = theme.design.border_thin;
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
         }
 
         int box = rect.h - 10;
-        r.drawRect(rect.x + 6, rect.y + 5, box, box, value ? Theme.toArgb(theme.widgetActive) : Theme.toArgb(theme.widgetOutline));
+        float boxR = Math.min(3.0f, theme.design.radius_sm);
+        int boxFill = value ? Theme.toArgb(theme.widgetActive) : Theme.toArgb(theme.widgetOutline);
+        r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
         float baselineY = r.baselineForBox(rect.y, rect.h);
         r.drawText(label, rect.x + 6 + box + 10, baselineY, Theme.toArgb(theme.text));
         return value;
     }
 
+    /**
+     * Begins a scrollable area.
+     *
+     * @param r             The renderer.
+     * @param key           Unique ID for the scroll state.
+     * @param x             X position.
+     * @param y             Y position.
+     * @param width         Width of the view area.
+     * @param height        Height of the view area.
+     * @param contentHeight Total height of the content inside.
+     * @return A {@link ScrollArea} object that must be passed to {@link #endScrollArea(ScrollArea)}.
+     */
     public ScrollArea beginScrollArea(UiRenderer r, String key, int x, int y, int width, int height, int contentHeight) {
         int id = id(key);
         ScrollState state = scrollStates.computeIfAbsent(id, k -> new ScrollState());
 
         boolean hovered = pxInside(mouse.x, mouse.y, x, y, width, height);
         if (hovered && input.scrollY() != 0.0) {
-            state.scrollY -= (float) (input.scrollY() * 28.0);
+            double wheel = input.consumeScrollY();
+            state.scrollY -= (float) (wheel * 28.0);
         }
 
         int maxScroll = Math.max(0, contentHeight - height);
@@ -197,6 +278,11 @@ public final class Ui {
         return new ScrollArea(r, id, x, y, width, height, maxScroll, state.scrollY);
     }
 
+    /**
+     * Ends a scrollable area. Restores the previous clipping and layout state.
+     *
+     * @param area The scroll area object returned by {@link #beginScrollArea}.
+     */
     public void endScrollArea(ScrollArea area) {
         area.renderer.flush();
         area.renderer.popClip();
@@ -210,6 +296,16 @@ public final class Ui {
         }
     }
 
+    /**
+     * Draws a float slider.
+     *
+     * @param r     The renderer.
+     * @param label The label text.
+     * @param value The current value.
+     * @param min   The minimum value.
+     * @param max   The maximum value.
+     * @return The updated value.
+     */
     public float sliderFloat(UiRenderer r, String label, float value, float min, float max) {
         int id = id(label);
         Rect rect = nextRect(theme.tokens.itemHeight);
@@ -242,13 +338,26 @@ public final class Ui {
         float t = (value - min) / (max - min);
         t = clamp01(t);
         float fillW = rect.w * t;
-        r.drawRect(rect.x, rect.y, fillW, rect.h, Theme.toArgb(theme.widgetActive));
+        int fill = Theme.toArgb(theme.widgetActive);
+        float fillRadius = Math.max(0.0f, theme.design.radius_sm - 1);
+        if (fillW > 1.0f) {
+            r.drawRoundedRect(rect.x + 1, rect.y + 1, Math.max(0.0f, fillW - 2.0f), rect.h - 2, fillRadius, fill);
+        }
 
         float baselineY = r.baselineForBox(rect.y, rect.h);
         r.drawText(label, rect.x + 10, baselineY, Theme.toArgb(theme.text));
         return value;
     }
 
+    /**
+     * Draws an image.
+     *
+     * @param r        The renderer.
+     * @param texture  The texture to draw.
+     * @param width    Width in pixels.
+     * @param height   Height in pixels.
+     * @param tintArgb Color tint.
+     */
     public void image(UiRenderer r, Texture texture, int width, int height, int tintArgb) {
         Rect rect = nextRect(height);
         int iw = Math.min(width, rect.w);
@@ -271,6 +380,31 @@ public final class Ui {
         spacer(2);
         r.drawRect(contentX, cursorY, contentW, 1, Theme.toArgb(theme.widgetOutline));
         spacer(theme.tokens.itemSpacing);
+    }
+
+    private static void drawBevelButton(UiRenderer r,
+                                        float x,
+                                        float y,
+                                        float w,
+                                        float h,
+                                        float radius,
+                                        int borderPx,
+                                        int bg,
+                                        int outline) {
+        int t = Math.max(1, borderPx);
+        if (w <= t * 2.0f || h <= t * 2.0f) {
+            r.drawRect(x, y, w, h, bg);
+            return;
+        }
+
+        int top = Theme.lightenArgb(bg, 0.06f);
+        int bottom = Theme.darkenArgb(bg, 0.06f);
+        r.drawRoundedRect(x, y, w, h, radius, top, top, bottom, bottom, t, outline);
+
+        int hl = Theme.lightenArgb(bg, 0.10f);
+        int hlA = (hl >>> 24) & 0xFF;
+        hl = ((Math.min(255, (int) (hlA * 0.35f))) << 24) | (hl & 0x00FFFFFF);
+        r.drawRoundedRect(x + t, y + t, w - t * 2.0f, 1.0f, Math.max(0.0f, radius - t - 1.0f), hl);
     }
 
     // (no outline helper; nine-slice outline uses NineSlice.drawWithOutline)

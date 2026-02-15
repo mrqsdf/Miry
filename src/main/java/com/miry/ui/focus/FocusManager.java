@@ -38,6 +38,10 @@ public final class FocusManager {
         return focusedId == id;
     }
 
+    public boolean hasAnyFocus() {
+        return focusedId != 0;
+    }
+
     public int focused() {
         return focusedId;
     }

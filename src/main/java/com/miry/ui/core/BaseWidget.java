@@ -3,9 +3,12 @@ package com.miry.ui.core;
 import com.miry.ui.UiContext;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
+import com.miry.ui.theme.WidgetVariant;
+import com.miry.ui.theme.WidgetStyle;
+import com.miry.ui.theme.StateColors;
 
 /**
- * Small retained-state base class used by the existing widgets in {@code com.miry.ui.widgets}.
+ * Retained-state base class used by the existing widgets in {@code com.miry.ui.widgets}.
  *
  * This is intentionally lightweight: widgets in this repo are explicit-position widgets
  * (render(x,y,w,h) style), so BaseWidget focuses on consistent interaction state:
@@ -19,6 +22,9 @@ public abstract class BaseWidget {
     private float hoverT;
     private float pressT;
     private float focusT;
+
+    private WidgetVariant variant = WidgetVariant.DEFAULT;
+    private WidgetStyle customStyle = null;
 
     public final int id() {
         return id;
@@ -38,6 +44,22 @@ public abstract class BaseWidget {
 
     public final void setFocusable(boolean focusable) {
         this.focusable = focusable;
+    }
+
+    public final WidgetVariant variant() {
+        return variant;
+    }
+
+    public final void setVariant(WidgetVariant variant) {
+        this.variant = variant != null ? variant : WidgetVariant.DEFAULT;
+    }
+
+    public final WidgetStyle customStyle() {
+        return customStyle;
+    }
+
+    public final void setCustomStyle(WidgetStyle style) {
+        this.customStyle = style;
     }
 
     /**
@@ -95,6 +117,39 @@ public abstract class BaseWidget {
         return focusT;
     }
 
+    /**
+     * Compute background color using state interpolation and variant.
+     * If customStyle has a backgroundColor override, use that instead.
+     */
+    protected final int computeStateColor(Theme theme) {
+        if (customStyle != null && customStyle.hasBackgroundColor()) {
+            return Theme.toArgb(customStyle.getBackgroundColor());
+        }
+        return StateColors.computeBackground(theme, hoverT, pressT, variant);
+    }
+
+    /**
+     * Compute border color using state interpolation and variant.
+     * If customStyle has a borderColor override, use that instead.
+     */
+    protected final int computeBorderColor(Theme theme) {
+        if (customStyle != null && customStyle.hasBorderColor()) {
+            return Theme.toArgb(customStyle.getBorderColor());
+        }
+        return StateColors.computeBorder(theme, hoverT, pressT, focusT, variant);
+    }
+
+    /**
+     * Compute text color based on variant.
+     * If customStyle has a textColor override, use that instead.
+     */
+    protected final int computeTextColor(Theme theme) {
+        if (customStyle != null && customStyle.hasTextColor()) {
+            return Theme.toArgb(customStyle.getTextColor());
+        }
+        return StateColors.computeText(theme, variant);
+    }
+
     protected final void drawFocusRing(UiRenderer r, Theme theme, float x, float y, float w, float h) {
         if (r == null || theme == null) {
             return;
@@ -127,7 +182,76 @@ public abstract class BaseWidget {
         r.drawRect(x + w - t, y, t, h, argb);
     }
 
-    private static float approachExp(float value, float target, float speed, float dt) {
+    /**
+     * Draw a simple "soft" drop shadow behind a rectangle using layered expanded rects.
+     * <p>
+     * This approximates a blurred shadow without requiring any renderer-side blur support.
+     */
+    protected static void drawDropShadow(UiRenderer r,
+                                         float x,
+                                         float y,
+                                         float w,
+                                         float h,
+                                         int shadowArgb,
+                                         float dx,
+                                         float dy,
+                                         int blurPx) {
+        drawDropShadow(r, x, y, w, h, shadowArgb, dx, dy, blurPx, 0.0f, 1.0f);
+    }
+
+    protected static void drawDropShadow(UiRenderer r,
+                                         float x,
+                                         float y,
+                                         float w,
+                                         float h,
+                                         int shadowArgb,
+                                         float dx,
+                                         float dy,
+                                         int blurPx,
+                                         float overallAlpha) {
+        drawDropShadow(r, x, y, w, h, shadowArgb, dx, dy, blurPx, 0.0f, overallAlpha);
+    }
+
+    protected static void drawDropShadow(UiRenderer r,
+                                         float x,
+                                         float y,
+                                         float w,
+                                         float h,
+                                         int shadowArgb,
+                                         float dx,
+                                         float dy,
+                                         int blurPx,
+                                         float radiusPx,
+                                         float overallAlpha) {
+        if (r == null) {
+            return;
+        }
+        float oa = clamp01(overallAlpha);
+        float radius = Math.max(0.0f, radiusPx);
+        int blur = Math.max(0, blurPx);
+        if (blur == 0) {
+            r.drawRoundedRect(x + dx, y + dy, w, h, radius, mulAlpha(shadowArgb, oa));
+            return;
+        }
+
+        int layers = Math.min(4, Math.max(2, (blur + 3) / 4));
+        for (int i = layers; i >= 0; i--) {
+            float t = i / (float) layers; // 1 = outermost, 0 = innermost
+            float expand = t * blur;
+            float alphaMul = 0.15f + (1.0f - t) * 0.40f; // outer ~= 0.15, inner ~= 0.55
+            int c = mulAlpha(shadowArgb, alphaMul * oa);
+            r.drawRoundedRect(x + dx - expand, y + dy - expand, w + expand * 2.0f, h + expand * 2.0f, radius + expand, c);
+        }
+    }
+
+    protected static int mulAlpha(int argb, float alphaMul) {
+        float m = clamp01(alphaMul);
+        int a = (argb >>> 24) & 0xFF;
+        int outA = clamp255(Math.round(a * m));
+        return (outA << 24) | (argb & 0x00FFFFFF);
+    }
+
+    protected static float approachExp(float value, float target, float speed, float dt) {
         if (dt <= 0.0f) {
             return target;
         }
@@ -137,5 +261,9 @@ public abstract class BaseWidget {
 
     private static float clamp01(float v) {
         return Math.max(0.0f, Math.min(1.0f, v));
+    }
+
+    private static int clamp255(int v) {
+        return Math.max(0, Math.min(255, v));
     }
 }

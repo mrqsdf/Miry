@@ -25,6 +25,15 @@ public final class Modal extends BaseWidget {
     private String inputText = "";
     private int defaultButtonIndex = -1;
     private int selectedButtonIndex = -1;
+    private int lastModalX;
+    private int lastModalY;
+    private int lastModalW;
+    private int lastModalH;
+    private int lastButtonW;
+    private int lastButtonH;
+    private int lastButtonGap;
+    private int lastButtonY;
+    private int lastButtonStartX;
 
     public Modal(Type type, String title, String message) {
         this.type = type;
@@ -139,43 +148,77 @@ public final class Modal extends BaseWidget {
 
         r.drawRect(0, 0, screenWidth, screenHeight, overlayColor);
 
-        int modalWidth = 400;
-        int modalHeight = 200;
+        int spaceSm = theme != null ? theme.design.space_sm : 8;
+        int spaceMd = theme != null ? theme.design.space_md : 12;
+        int spaceLg = theme != null ? theme.design.space_lg : 16;
+        int space2xl = theme != null ? theme.design.space_2xl : 32;
+        int borderThin = theme != null ? theme.design.border_thin : 1;
+
+        int modalWidth = theme != null ? (space2xl * 12 + spaceLg) : 400;
+        int modalHeight = theme != null ? (space2xl * 6 + spaceSm) : 200;
         int modalX = (screenWidth - modalWidth) / 2;
         int modalY = (screenHeight - modalHeight) / 2;
+        lastModalX = modalX;
+        lastModalY = modalY;
+        lastModalW = modalWidth;
+        lastModalH = modalHeight;
 
-        r.drawRect(modalX + 6, modalY + 8, modalWidth, modalHeight, 0x2A000000);
+        if (theme != null) {
+            int shadow = Theme.toArgb(theme.shadow);
+            drawDropShadow(r, modalX, modalY, modalWidth, modalHeight, shadow, 0.0f, theme.design.space_xs, theme.design.shadow_lg, theme.design.radius_sm, 1.0f);
+        } else {
+            drawDropShadow(r, modalX, modalY, modalWidth, modalHeight, 0x2A000000, 0.0f, 6.0f, 12);
+        }
         if (theme != null && theme.skins.popup != null) {
             theme.skins.popup.draw(r, modalX, modalY, modalWidth, modalHeight, bgColor);
         } else {
-            r.drawRect(modalX, modalY, modalWidth, modalHeight, bgColor);
+            float radius = theme != null ? theme.design.radius_sm : 3.0f;
+            int t = borderThin;
+            int top = Theme.lightenArgb(bgColor, 0.02f);
+            int bottom = Theme.darkenArgb(bgColor, 0.02f);
+            r.drawRoundedRect(modalX, modalY, modalWidth, modalHeight, radius, top, top, bottom, bottom, t, outlineColor);
         }
-        r.drawRect(modalX, modalY, modalWidth, 2, outlineColor);
 
-        float titleBaseline = modalY + 20.0f + r.ascent();
-        float messageBaseline = titleBaseline + r.lineHeight() + 8.0f;
-        r.drawText(title, modalX + 20, titleBaseline, textColor);
-        r.drawText(message, modalX + 20, messageBaseline, textColor);
+        float titleBaseline = modalY + (spaceLg + (theme != null ? theme.design.space_xs : 4)) + r.ascent();
+        float messageBaseline = titleBaseline + r.lineHeight() + spaceSm;
+        r.drawText(title, modalX + spaceLg, titleBaseline, textColor);
+        r.drawText(message, modalX + spaceLg, messageBaseline, textColor);
 
-        int buttonY = modalY + modalHeight - 50;
-        int buttonX = modalX + modalWidth - 120;
+        int buttonW = theme != null ? (space2xl * 3 + (theme.design.space_xs)) : 100;
+        int buttonH = theme != null ? (theme.design.widget_height_md + borderThin * 2) : 30;
+        int buttonGap = theme != null ? (spaceSm + borderThin * 2) : 10;
+
+        int buttonY = modalY + modalHeight - buttonH - (spaceLg + spaceSm);
+        int buttonX = modalX + modalWidth - buttonW - spaceLg;
+        lastButtonW = buttonW;
+        lastButtonH = buttonH;
+        lastButtonGap = buttonGap;
+        lastButtonY = buttonY;
+        lastButtonStartX = buttonX;
         for (int i = buttons.size() - 1; i >= 0; i--) {
             Button btn = buttons.get(i);
-            boolean hovered = mouseX >= buttonX && mouseY >= buttonY && mouseX < buttonX + 100 && mouseY < buttonY + 30;
+            boolean hovered = mouseX >= buttonX && mouseY >= buttonY && mouseX < buttonX + buttonW && mouseY < buttonY + buttonH;
             int bg = hovered ? buttonHoverColor : buttonBgColor;
             if (!enabled()) {
                 bg = dimAlpha(bg, 0.55f);
             }
-            r.drawRect(buttonX, buttonY, 100, 30, bg);
-            r.drawRect(buttonX, buttonY, 100, 1, outlineColor);
-            if (i == selectedButtonIndex) {
-                r.drawRect(buttonX, buttonY + 29, 100, 1, outlineColor);
-                r.drawRect(buttonX, buttonY, 1, 30, outlineColor);
-                r.drawRect(buttonX + 99, buttonY, 1, 30, outlineColor);
+            if (theme != null && theme.skins.widget != null) {
+                theme.skins.widget.drawWithOutline(r, buttonX, buttonY, buttonW, buttonH, bg, outlineColor, borderThin);
+            } else {
+                float br = theme != null ? theme.design.radius_sm : 3.0f;
+                int bt = Math.max(1, borderThin);
+                int top = Theme.lightenArgb(bg, 0.06f);
+                int bottom = Theme.darkenArgb(bg, 0.06f);
+                r.drawRoundedRect(buttonX, buttonY, buttonW, buttonH, br, top, top, bottom, bottom, bt, outlineColor);
             }
-            float baselineY = r.baselineForBox(buttonY, 30);
-            r.drawText(btn.label, buttonX + 10, baselineY, textColor);
-            buttonX -= 110;
+            if (i == selectedButtonIndex) {
+                r.drawRect(buttonX, buttonY + buttonH - borderThin, buttonW, borderThin, outlineColor);
+                r.drawRect(buttonX, buttonY, borderThin, buttonH, outlineColor);
+                r.drawRect(buttonX + buttonW - borderThin, buttonY, borderThin, buttonH, outlineColor);
+            }
+            float baselineY = r.baselineForBox(buttonY, buttonH);
+            r.drawText(btn.label, buttonX + spaceSm, baselineY, textColor);
+            buttonX -= (buttonW + buttonGap);
         }
 
         if (!enabled()) {
@@ -186,20 +229,23 @@ public final class Modal extends BaseWidget {
     public boolean handleClick(int screenWidth, int screenHeight, int mx, int my) {
         if (!enabled() || !open) return false;
 
-        int modalWidth = 400;
-        int modalHeight = 200;
-        int modalX = (screenWidth - modalWidth) / 2;
-        int modalY = (screenHeight - modalHeight) / 2;
+        int modalWidth = lastModalW > 0 ? lastModalW : 400;
+        int modalHeight = lastModalH > 0 ? lastModalH : 200;
+        int modalX = lastModalW > 0 ? lastModalX : (screenWidth - modalWidth) / 2;
+        int modalY = lastModalH > 0 ? lastModalY : (screenHeight - modalHeight) / 2;
 
         if (mx < modalX || my < modalY || mx >= modalX + modalWidth || my >= modalY + modalHeight) {
             return true;
         }
 
-        int buttonY = modalY + modalHeight - 50;
-        int buttonX = modalX + modalWidth - 120;
+        int buttonW = lastButtonW > 0 ? lastButtonW : 100;
+        int buttonH = lastButtonH > 0 ? lastButtonH : 30;
+        int buttonGap = lastButtonGap > 0 ? lastButtonGap : 10;
+        int buttonY = lastButtonY > 0 ? lastButtonY : (modalY + modalHeight - 50);
+        int buttonX = lastButtonStartX > 0 ? lastButtonStartX : (modalX + modalWidth - 120);
         for (int i = buttons.size() - 1; i >= 0; i--) {
             Button btn = buttons.get(i);
-            if (mx >= buttonX && my >= buttonY && mx < buttonX + 100 && my < buttonY + 30) {
+            if (mx >= buttonX && my >= buttonY && mx < buttonX + buttonW && my < buttonY + buttonH) {
                 selectedButtonIndex = i;
                 if (btn.action != null) {
                     btn.action.run();
@@ -207,7 +253,7 @@ public final class Modal extends BaseWidget {
                 close();
                 return true;
             }
-            buttonX -= 110;
+            buttonX -= (buttonW + buttonGap);
         }
 
         return true;

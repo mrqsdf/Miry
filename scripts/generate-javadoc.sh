@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-"$ROOT_DIR/docs/api"}"
 
-LWJGL_VERSION="${LWJGL_VERSION:-3.3.3}"
+LWJGL_VERSION="${LWJGL_VERSION:-3.4.1}"
 JOML_VERSION="${JOML_VERSION:-1.10.7}"
 
 DEPS_DIR="$ROOT_DIR/build/javadoc-deps"

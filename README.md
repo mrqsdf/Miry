@@ -16,6 +16,11 @@ UI toolkit for Java + LWJGL (OpenGL), built around a small immediate-mode core a
 ## Embedding
 
 Widgets render through `com.miry.ui.render.UiRenderer`. The demo uses `com.miry.graphics.batch.BatchRenderer` (OpenGL sprite batch), but you can swap this for your own renderer as long as it implements `UiRenderer`.
+
+## Running Demos
+
+- Comprehensive demo: `./gradlew run` or `./gradlew run --args=comprehensive`
+- Editor layout demo: `./gradlew run --args=editor`
 ## Status
 
 Work-in-progress editor UI library; APIs and visuals are expected to evolve.

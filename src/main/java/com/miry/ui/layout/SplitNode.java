@@ -8,8 +8,8 @@ import java.util.Objects;
  * A docking layout node that splits its region between two children.
  */
 public final class SplitNode extends DockNode {
-    public final DockNode childA;
-    public final DockNode childB;
+    public DockNode childA;
+    public DockNode childB;
     public final boolean vertical;
     public float splitRatio;
 
@@ -20,6 +20,19 @@ public final class SplitNode extends DockNode {
         this.splitRatio = clamp01(splitRatio);
         this.childA.parent = this;
         this.childB.parent = this;
+    }
+
+    public void replaceChild(DockNode oldNode, DockNode newNode) {
+        if (newNode == null || oldNode == null) return;
+        if (childA == oldNode) {
+            childA = newNode;
+            newNode.parent = this;
+            oldNode.parent = null;
+        } else if (childB == oldNode) {
+            childB = newNode;
+            newNode.parent = this;
+            oldNode.parent = null;
+        }
     }
 
     @Override

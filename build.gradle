@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'maven-publish'
 }
 
 group = 'com.miry'
@@ -14,9 +15,11 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
+    withSourcesJar()
+    withJavadocJar()
 }
 
-def lwjglVersion = '3.3.3'
+def lwjglVersion = '3.4.1'
 def lwjglNatives = {
     def os = System.getProperty('os.name').toLowerCase()
     def arch = System.getProperty('os.arch').toLowerCase()
@@ -27,16 +30,26 @@ def lwjglNatives = {
     return isArm64 ? 'natives-linux-arm64' : 'natives-linux'
 }.call()
 
+configurations {
+    demoRuntime
+}
+
 dependencies {
-    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
-    implementation 'org.lwjgl:lwjgl'
-    implementation 'org.lwjgl:lwjgl-glfw'
-    implementation 'org.lwjgl:lwjgl-opengl'
-    implementation 'org.lwjgl:lwjgl-stb'
-    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
-    runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
-    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
-    runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
+    compileOnly platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    compileOnly 'org.lwjgl:lwjgl'
+    compileOnly 'org.lwjgl:lwjgl-glfw'
+    compileOnly 'org.lwjgl:lwjgl-opengl'
+    compileOnly 'org.lwjgl:lwjgl-stb'
+
+    demoRuntime platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    demoRuntime 'org.lwjgl:lwjgl'
+    demoRuntime 'org.lwjgl:lwjgl-glfw'
+    demoRuntime 'org.lwjgl:lwjgl-opengl'
+    demoRuntime 'org.lwjgl:lwjgl-stb'
+    demoRuntime "org.lwjgl:lwjgl::${lwjglNatives}"
+    demoRuntime "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+    demoRuntime "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    demoRuntime "org.lwjgl:lwjgl-stb::${lwjglNatives}"
 
     implementation 'org.joml:joml:1.10.7'
 
@@ -46,7 +59,45 @@ dependencies {
 }
 
 application {
-    mainClass = 'com.miry.DemoMain'
+    mainClass = 'com.miry.demo.Launcher'
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+        applicationDefaultJvmArgs = ['-XstartOnFirstThread']
+    } else {
+        applicationDefaultJvmArgs = []
+    }
+}
+
+run {
+    def os = System.getProperty('os.name').toLowerCase()
+    if (os.contains('linux')) {
+        jvmArgs = [
+            '-Dorg.lwjgl.util.DebugLoader=true',
+            '-Dorg.lwjgl.util.Debug=true'
+        ]
+    } else if (os.contains('mac')) {
+        jvmArgs = ['-XstartOnFirstThread']
+    }
+}
+
+tasks.withType(JavaExec).configureEach {
+    classpath = classpath + configurations.demoRuntime
+    doFirst {
+        classpath = classpath + configurations.demoRuntime
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    graph.allTasks.findAll { it instanceof JavaExec }.each { JavaExec t ->
+        t.classpath = t.classpath + configurations.demoRuntime
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
 }
 
 test {

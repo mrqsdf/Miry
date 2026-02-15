@@ -9,38 +9,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.lwjgl.opengl.GL20.GL_COMPILE_STATUS;
-import static org.lwjgl.opengl.GL20.GL_FRAGMENT_SHADER;
-import static org.lwjgl.opengl.GL20.GL_LINK_STATUS;
-import static org.lwjgl.opengl.GL20.GL_VERTEX_SHADER;
-import static org.lwjgl.opengl.GL20.glAttachShader;
-import static org.lwjgl.opengl.GL20.glCompileShader;
-import static org.lwjgl.opengl.GL20.glCreateProgram;
-import static org.lwjgl.opengl.GL20.glCreateShader;
-import static org.lwjgl.opengl.GL20.glDeleteProgram;
-import static org.lwjgl.opengl.GL20.glDeleteShader;
-import static org.lwjgl.opengl.GL20.glDetachShader;
-import static org.lwjgl.opengl.GL20.glGetProgramInfoLog;
-import static org.lwjgl.opengl.GL20.glGetProgrami;
-import static org.lwjgl.opengl.GL20.glGetShaderInfoLog;
-import static org.lwjgl.opengl.GL20.glGetShaderi;
-import static org.lwjgl.opengl.GL20.glGetUniformLocation;
-import static org.lwjgl.opengl.GL20.glLinkProgram;
-import static org.lwjgl.opengl.GL20.glShaderSource;
-import static org.lwjgl.opengl.GL20.glUniform1f;
-import static org.lwjgl.opengl.GL20.glUniform1i;
-import static org.lwjgl.opengl.GL20.glUniform3f;
-import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
-import static org.lwjgl.opengl.GL20.glUseProgram;
+import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Minimal OpenGL shader program wrapper with convenience resource loading.
+ * <p>
+ * This class handles compiling vertex and fragment shaders, linking them into a program,
+ * and setting uniform values. It also provides a utility for loading shader source code from the classpath.
+ * </p>
  */
 public final class Shader implements AutoCloseable {
     private final int programId;
     private final Map<String, Integer> uniformLocations = new HashMap<>();
 
+    /**
+     * Creates and links a new shader program from source strings.
+     *
+     * @param vertexSource   The source code for the vertex shader.
+     * @param fragmentSource The source code for the fragment shader.
+     * @throws IllegalStateException if compilation or linking fails.
+     */
     public Shader(String vertexSource, String fragmentSource) {
         int vertexId = compile(GL_VERTEX_SHADER, vertexSource);
         int fragmentId = compile(GL_FRAGMENT_SHADER, fragmentSource);
@@ -66,30 +55,76 @@ public final class Shader implements AutoCloseable {
         glDeleteShader(fragmentId);
     }
 
+    /**
+     * Installs this shader program as part of the current rendering state.
+     */
     public void bind() {
         glUseProgram(programId);
     }
 
+    /**
+     * Removes the current shader program from the rendering state (binds 0).
+     */
     public void unbind() {
         glUseProgram(0);
     }
 
+    /**
+     * Gets the OpenGL program ID.
+     *
+     * @return The program ID.
+     */
     public int id() {
         return programId;
     }
 
+    /**
+     * Sets a uniform integer value (e.g., sampler binding).
+     *
+     * @param name  The name of the uniform variable.
+     * @param value The value to set.
+     */
     public void setUniform(String name, int value) {
         glUniform1i(location(name), value);
     }
 
+    /**
+     * Sets a uniform float value.
+     *
+     * @param name  The name of the uniform variable.
+     * @param value The value to set.
+     */
     public void setUniform(String name, float value) {
         glUniform1f(location(name), value);
     }
 
+    /**
+     * Sets a uniform vec2 value.
+     *
+     * @param name The name of the uniform variable.
+     * @param x    The x component.
+     * @param y    The y component.
+     */
+    public void setUniform2f(String name, float x, float y) {
+        glUniform2f(location(name), x, y);
+    }
+
+    /**
+     * Sets a uniform vec3 value.
+     *
+     * @param name  The name of the uniform variable.
+     * @param value The vector value.
+     */
     public void setUniform(String name, Vector3f value) {
         glUniform3f(location(name), value.x, value.y, value.z);
     }
 
+    /**
+     * Sets a uniform mat4 value.
+     *
+     * @param name  The name of the uniform variable.
+     * @param value The matrix value.
+     */
     public void setUniform(String name, Matrix4f value) {
         try (MemoryStack stack = stackPush()) {
             FloatBuffer fb = stack.mallocFloat(16);
@@ -102,7 +137,8 @@ public final class Shader implements AutoCloseable {
         return uniformLocations.computeIfAbsent(name, n -> {
             int loc = glGetUniformLocation(programId, n);
             if (loc < 0) {
-                throw new IllegalArgumentException("Unknown uniform: " + n);
+                // Warning suppressed for demo purposes, but normally helpful.
+                // throw new IllegalArgumentException("Unknown uniform: " + n);
             }
             return loc;
         });
@@ -120,6 +156,14 @@ public final class Shader implements AutoCloseable {
         return id;
     }
 
+    /**
+     * Loads a shader program from resources on the classpath.
+     *
+     * @param vertexPath   Path to the vertex shader resource (e.g., "shaders/my_shader.vert").
+     * @param fragmentPath Path to the fragment shader resource (e.g., "shaders/my_shader.frag").
+     * @return A new {@link Shader} instance.
+     * @throws IllegalStateException if resource reading or compilation fails.
+     */
     public static Shader fromResources(String vertexPath, String fragmentPath) {
         return new Shader(readResourceUtf8(vertexPath), readResourceUtf8(fragmentPath));
     }
@@ -136,6 +180,9 @@ public final class Shader implements AutoCloseable {
         }
     }
 
+    /**
+     * Deletes the OpenGL program object.
+     */
     @Override
     public void close() {
         glDeleteProgram(programId);

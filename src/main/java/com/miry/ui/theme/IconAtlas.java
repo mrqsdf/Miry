@@ -2,6 +2,8 @@ package com.miry.ui.theme;
 
 import com.miry.graphics.Texture;
 import com.miry.ui.render.UiRenderer;
+import com.miry.ui.vector.VectorIcon;
+import com.miry.ui.vector.VectorIcons;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -50,8 +52,34 @@ public final class IconAtlas {
             case CHEVRON_DOWN -> "v";
             case CHEVRON_RIGHT -> ">";
             case CHEVRON_UP -> "^";
+            case CHEVRON_LEFT -> "<";
             case CLOSE -> "x";
             case CHECK -> "✓";
+            case EYEDROPPER -> "⊙";
+            case SELECT -> "S";
+            case MOVE -> "M";
+            case ROTATE -> "R";
+            case SCALE -> "E";
+            case LOCK -> "🔒";
+            case UNLOCK -> "🔓";
+            case VISIBLE -> "👁";
+            case INVISIBLE -> "⊘";
+            case GRID -> "#";
+            case SNAP -> "⊞";
+            case SEARCH -> "🔍";
+            case ADD -> "+";
+            case FOLDER -> "📁";
+            case FILE -> "📄";
+            case SETTINGS -> "⚙";
+            case PLAY -> "▶";
+            case PAUSE -> "⏸";
+            case STOP -> "⏹";
+            case EYE -> "👁";
+            case EYE_OFF -> "⊘";
+            case CODE -> "{ }";
+            case TEXT -> "T";
+            case IMAGE -> "🖼";
+            case SHADER -> "◆";
         };
     }
 
@@ -69,6 +97,13 @@ public final class IconAtlas {
             return;
         }
 
+        VectorIcon vec = vector(icon);
+        if (vec != null) {
+            float stroke = Math.max(1.25f, size * 0.12f);
+            vec.drawStroke(r, x, y, size, stroke, tintArgb);
+            return;
+        }
+
         String g = glyph(icon);
         if (g == null || g.isEmpty()) {
             return;
@@ -76,5 +111,41 @@ public final class IconAtlas {
         float baseline = r.baselineForBox(y, size);
         float gx = x + (size - r.measureText(g)) * 0.5f;
         r.drawText(g, gx, baseline, tintArgb);
+    }
+
+    private static VectorIcon vector(Icon icon) {
+        return switch (icon) {
+            case CHEVRON_DOWN -> VectorIcons.CHEVRON_DOWN;
+            case CHEVRON_RIGHT -> VectorIcons.CHEVRON_RIGHT;
+            case CHEVRON_UP -> VectorIcons.CHEVRON_UP;
+            case CHEVRON_LEFT -> VectorIcons.CHEVRON_LEFT;
+            case CLOSE -> VectorIcons.CLOSE;
+            case CHECK -> VectorIcons.CHECK;
+            case EYEDROPPER -> VectorIcons.EYEDROPPER;
+            case SELECT -> VectorIcons.SELECT;
+            case MOVE -> VectorIcons.MOVE;
+            case ROTATE -> VectorIcons.ROTATE;
+            case SCALE -> VectorIcons.SCALE;
+            case LOCK -> VectorIcons.LOCK;
+            case UNLOCK -> VectorIcons.UNLOCK;
+            case VISIBLE -> VectorIcons.VISIBLE;
+            case INVISIBLE -> VectorIcons.INVISIBLE;
+            case GRID -> VectorIcons.GRID;
+            case SNAP -> VectorIcons.SNAP;
+            case SEARCH -> VectorIcons.SEARCH;
+            case ADD -> VectorIcons.ADD;
+            case FOLDER -> VectorIcons.FOLDER;
+            case FILE -> VectorIcons.FILE;
+            case SETTINGS -> VectorIcons.SETTINGS;
+            case PLAY -> null; // PLAY_TRIANGLE is FilledVectorIcon, handled separately
+            case PAUSE -> VectorIcons.PAUSE;
+            case STOP -> VectorIcons.STOP;
+            case EYE -> VectorIcons.VISIBLE;
+            case EYE_OFF -> VectorIcons.INVISIBLE;
+            case CODE -> null;
+            case TEXT -> null;
+            case IMAGE -> null;
+            case SHADER -> null;
+        };
     }
 }

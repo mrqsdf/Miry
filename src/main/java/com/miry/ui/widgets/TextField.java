@@ -9,6 +9,9 @@ import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
 import com.miry.platform.InputConstants;
+import com.miry.ui.util.NumericExpression;
+
+import java.util.Locale;
 
 /**
  * Editable text input widget with optional multi-line mode.
@@ -20,6 +23,10 @@ public final class TextField extends BaseWidget {
     private int selectionEnd;
     private boolean multiline;
     private int maxLength = 1024;
+    private float caretTime;
+    private boolean numericMode;
+    private NumericExpression.UnitKind numericUnitKind = NumericExpression.UnitKind.NONE;
+    private int numericDecimals = 2;
 
     public TextField() {}
 
@@ -42,6 +49,7 @@ public final class TextField extends BaseWidget {
             text.insert(cursorPos, (char) e.codepoint());
             cursorPos++;
             clearSelection();
+            caretTime = 0.0f;
         }
     }
 
@@ -63,6 +71,7 @@ public final class TextField extends BaseWidget {
                     cursorPos--;
                     clearSelection();
                 }
+                caretTime = 0.0f;
             }
             case InputConstants.KEY_DELETE -> {
                 if (hasSelection()) {
@@ -71,6 +80,7 @@ public final class TextField extends BaseWidget {
                     text.deleteCharAt(cursorPos);
                     clearSelection();
                 }
+                caretTime = 0.0f;
             }
             case InputConstants.KEY_RIGHT -> {
                 moveCursor(cursorPos + 1, e.hasShift());
@@ -83,6 +93,9 @@ public final class TextField extends BaseWidget {
             case InputConstants.KEY_ENTER -> {
                 if (multiline) {
                     insertChar('\n');
+                    caretTime = 0.0f;
+                } else if (numericMode) {
+                    evaluateNumericExpression();
                 }
             }
             case InputConstants.KEY_A -> {
@@ -98,15 +111,46 @@ public final class TextField extends BaseWidget {
             case InputConstants.KEY_V -> {
                 if (e.hasCtrl()) {
                     paste(clipboard.getText());
+                    caretTime = 0.0f;
                 }
             }
             case InputConstants.KEY_X -> {
                 if (e.hasCtrl() && hasSelection()) {
                     clipboard.setText(getSelectedText());
                     deleteSelection();
+                    caretTime = 0.0f;
                 }
             }
         }
+    }
+
+    public void setNumericMode(boolean enabled) {
+        this.numericMode = enabled;
+    }
+
+    public void setNumericMode(boolean enabled, NumericExpression.UnitKind unitKind, int decimals) {
+        this.numericMode = enabled;
+        this.numericUnitKind = unitKind != null ? unitKind : NumericExpression.UnitKind.NONE;
+        this.numericDecimals = Math.max(0, Math.min(8, decimals));
+    }
+
+    private void evaluateNumericExpression() {
+        String s = text.toString().trim();
+        if (s.isEmpty()) {
+            return;
+        }
+        double v;
+        try {
+            v = NumericExpression.evaluate(s, numericUnitKind);
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+        String formatted = String.format(Locale.ROOT, "%." + numericDecimals + "f", v);
+        text.setLength(0);
+        text.append(formatted);
+        cursorPos = text.length();
+        clearSelection();
+        caretTime = 0.0f;
     }
 
     private void insertChar(char ch) {
@@ -197,41 +241,58 @@ public final class TextField extends BaseWidget {
 
         if (hovered && input.mousePressed()) {
             focus(ctx);
+            caretTime = 0.0f;
         }
 
+        // Use new variant system if enabled
         int bg = enabled()
-            ? Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT())
+            ? computeStateColor(theme)
             : Theme.toArgb(theme.disabledBg);
-        if (enabled() && pressT() > 0.001f) {
-            bg = Theme.lerpArgb(theme.widgetHover, theme.widgetActive, pressT() * 0.18f);
-        }
 
-        int outline = Theme.toArgb(isFocused(ctx) ? theme.widgetActive : theme.widgetOutline);
-        int textColor = enabled() ? Theme.toArgb(theme.text) : Theme.toArgb(theme.disabledFg);
+        int outline = enabled()
+            ? computeBorderColor(theme)
+            : Theme.toArgb(theme.widgetOutline);
+
+        int textColor = enabled()
+            ? computeTextColor(theme)
+            : Theme.toArgb(theme.disabledFg);
         int cursorColor = Theme.toArgb(theme.widgetActive);
 
         if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, x, y, width, height, bg, outline, 1);
+            theme.skins.widget.drawWithOutline(r, x, y, width, height, bg, outline, theme.design.border_thin);
         } else {
-            r.drawRect(x, y, width, height, bg);
-            drawOutline(r, x, y, width, height, 1, outline);
+            int t = theme.design.border_thin;
+            float radius = theme.design.radius_sm;
+            int top = Theme.lightenArgb(bg, 0.06f);
+            int bottom = Theme.darkenArgb(bg, 0.06f);
+            r.drawRoundedRect(x, y, width, height, radius, top, top, bottom, bottom, t, outline);
         }
         if (enabled() && !pressed) {
-            r.drawRect(x + 1, y + 1, width - 2, 1, 0x22000000);
+            int t = theme.design.border_thin;
+            int hl = Theme.lightenArgb(bg, 0.12f);
+            int a = (int) (((hl >>> 24) & 0xFF) * 0.20f);
+            r.drawRect(x + t, y + t, width - t * 2, t, (a << 24) | (hl & 0x00FFFFFF));
         }
 
         drawFocusRing(r, theme, x, y, width, height);
 
-        boolean showCaret = enabled() && isFocused(ctx);
-        renderText(r, x, y, width, height, textColor, cursorColor, showCaret);
+        boolean focused = enabled() && isFocused(ctx);
+        if (focused) {
+            caretTime += (ctx != null ? ctx.lastDt() : 0.0f);
+        } else {
+            caretTime = 0.0f;
+        }
+        boolean showCaret = focused && caretVisible(caretTime);
+        renderText(r, theme, x, y, width, height, textColor, cursorColor, showCaret);
     }
 
     public void render(UiRenderer r, int x, int y, int width, int height, int bgColor, int textColor, int cursorColor) {
         r.drawRect(x, y, width, height, bgColor);
-        renderText(r, x, y, width, height, textColor, cursorColor, true);
+        renderText(r, null, x, y, width, height, textColor, cursorColor, true);
     }
 
     private void renderText(UiRenderer r,
+                            Theme theme,
                             int x,
                             int y,
                             int width,
@@ -240,13 +301,16 @@ public final class TextField extends BaseWidget {
                             int cursorColor,
                             boolean showCaret) {
         String str = text.toString();
-        float textX = x + 4.0f;
-        float baselineY = multiline ? (y + 4.0f + r.ascent()) : r.baselineForBox(y, height);
+        int padX = theme != null ? theme.design.space_sm : 4;
+        int padY = theme != null ? theme.design.space_xs : 4;
+        int border = theme != null ? theme.design.border_thin : 1;
+        float textX = x + padX;
+        float baselineY = multiline ? (y + padY + r.ascent()) : r.baselineForBox(y, height);
 
-        int clipX = x + 2;
-        int clipY = y + 2;
-        int clipW = Math.max(0, width - 4);
-        int clipH = Math.max(0, height - 4);
+        int clipX = x + border + 1;
+        int clipY = y + border + 1;
+        int clipW = Math.max(0, width - (border + 1) * 2);
+        int clipH = Math.max(0, height - (border + 1) * 2);
         r.flush();
         r.pushClip(clipX, clipY, clipW, clipH);
 
@@ -263,7 +327,8 @@ public final class TextField extends BaseWidget {
                 float x0 = textX + r.measureText(str.substring(a.lineStartIndex, start));
                 float x1 = textX + r.measureText(str.substring(b.lineStartIndex, end));
                 float topY = lineBaseline - r.ascent();
-                r.drawRect(x0, topY + 1.0f, Math.max(0.0f, x1 - x0), Math.max(0.0f, r.lineHeight() - 2.0f), 0x5050A0FF);
+                int sel = theme != null ? withAlpha(Theme.toArgb(theme.widgetActive), 0x55) : 0x5050A0FF;
+                r.drawRect(x0, topY + 1.0f, Math.max(0.0f, x1 - x0), Math.max(0.0f, r.lineHeight() - 2.0f), sel);
             }
         }
 
@@ -275,7 +340,8 @@ public final class TextField extends BaseWidget {
             float lineBaseline = baselineY + caret.lineIndex * r.lineHeight();
             float cursorX = textX + r.measureText(str.substring(caret.lineStartIndex, safeCursorPos));
             float topY = lineBaseline - r.ascent();
-            r.drawRect(cursorX, topY + 1.0f, 2.0f, Math.max(0.0f, r.lineHeight() - 2.0f), cursorColor);
+            int caretW = theme != null ? theme.design.border_medium : 2;
+            r.drawRect(cursorX, topY + 1.0f, caretW, Math.max(0.0f, r.lineHeight() - 2.0f), cursorColor);
         }
 
         r.flush();
@@ -296,6 +362,21 @@ public final class TextField extends BaseWidget {
     }
 
     private record CaretPos(int lineIndex, int lineStartIndex) {}
+
+    private static boolean caretVisible(float t) {
+        float period = 0.90f;
+        float on = 0.55f;
+        if (period <= 0.0f) {
+            return true;
+        }
+        float tt = t % period;
+        return tt < on;
+    }
+
+    private static int withAlpha(int argb, int alpha) {
+        int a = Math.max(0, Math.min(255, alpha));
+        return (a << 24) | (argb & 0x00FFFFFF);
+    }
 
     public String text() { return text.toString(); }
     public void setText(String str) {

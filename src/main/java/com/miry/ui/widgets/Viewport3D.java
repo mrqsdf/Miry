@@ -24,6 +24,11 @@ import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glDisable;
 import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
+import static org.lwjgl.opengl.GL11.glIsEnabled;
+import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
@@ -37,6 +42,13 @@ import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL15.glDeleteBuffers;
+import static org.lwjgl.opengl.GL20.GL_CURRENT_PROGRAM;
+import static org.lwjgl.opengl.GL20.glUseProgram;
+import static org.lwjgl.opengl.GL30.GL_VERTEX_ARRAY_BINDING;
+import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER_BINDING;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL30.glBindFramebuffer;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 
 /**
  * Offscreen-rendered 3D viewport used for editor previews.
@@ -207,7 +219,8 @@ public final class Viewport3D implements AutoCloseable {
         }
 
         if (inside && input.scrollY() != 0.0) {
-            float factor = (float) Math.pow(1.12, -input.scrollY());
+            double wheel = input.consumeScrollY();
+            float factor = (float) Math.pow(1.12, -wheel);
             distance = clamp(distance * factor, 1.2f, 22.0f);
         }
 
@@ -236,49 +249,79 @@ public final class Viewport3D implements AutoCloseable {
     }
 
     public void renderToTexture(int pixelW, int pixelH, int restoreViewportW, int restoreViewportH, float timeSeconds) {
-        framebuffer.ensureSize(pixelW, pixelH);
-        framebuffer.bind();
+        int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
+        int prevProgram = glGetInteger(GL_CURRENT_PROGRAM);
+        int prevVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
+        int prevArrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
+        boolean prevDepthTest = glIsEnabled(GL_DEPTH_TEST);
+        int prevViewportX;
+        int prevViewportY;
+        int prevViewportW;
+        int prevViewportH;
+        {
+            IntBuffer vp = BufferUtils.createIntBuffer(4);
+            glGetIntegerv(GL_VIEWPORT, vp);
+            prevViewportX = vp.get(0);
+            prevViewportY = vp.get(1);
+            prevViewportW = vp.get(2);
+            prevViewportH = vp.get(3);
+        }
 
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0.07f, 0.07f, 0.09f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        try {
+            framebuffer.ensureSize(pixelW, pixelH);
+            framebuffer.bind();
 
-        Matrix4f proj = new Matrix4f().perspective((float) Math.toRadians(50.0), pixelW / (float) pixelH, 0.05f, 200.0f);
-        Matrix4f view = new Matrix4f();
-        Vector3f camPos = cameraPosition();
-        view.lookAt(camPos, target, new Vector3f(0.0f, 1.0f, 0.0f));
+            glEnable(GL_DEPTH_TEST);
+            glClearColor(0.07f, 0.07f, 0.09f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.bind();
+            Matrix4f proj = new Matrix4f().perspective((float) Math.toRadians(50.0), pixelW / (float) pixelH, 0.05f, 200.0f);
+            Matrix4f view = new Matrix4f();
+            Vector3f camPos = cameraPosition();
+            view.lookAt(camPos, target, new Vector3f(0.0f, 1.0f, 0.0f));
 
-        // Cube
-        Matrix4f model = new Matrix4f()
-            .translate(objectPos)
-            .rotateY(timeSeconds * 0.55f)
-            .rotateX(timeSeconds * 0.23f);
-        Matrix4f mvp = new Matrix4f(proj).mul(view).mul(model);
-        shader.setUniform("uMvp", mvp);
-        glBindVertexArray(cubeVao);
-        glDrawElements(GL_TRIANGLES, cubeIndexCount, org.lwjgl.opengl.GL11.GL_UNSIGNED_INT, 0L);
-        glBindVertexArray(0);
+            shader.bind();
 
-        // Lines (grid + gizmo)
-        Matrix4f vp = new Matrix4f(proj).mul(view);
-        shader.setUniform("uMvp", vp);
-        updateLines();
-        glBindVertexArray(linesVao);
-        glDrawArrays(GL_LINES, 0, linesVertexCount);
-        glBindVertexArray(0);
+            // Cube
+            Matrix4f model = new Matrix4f()
+                .translate(objectPos)
+                .rotateY(timeSeconds * 0.55f)
+                .rotateX(timeSeconds * 0.23f);
+            Matrix4f mvp = new Matrix4f(proj).mul(view).mul(model);
+            shader.setUniform("uMvp", mvp);
+            glBindVertexArray(cubeVao);
+            glDrawElements(GL_TRIANGLES, cubeIndexCount, org.lwjgl.opengl.GL11.GL_UNSIGNED_INT, 0L);
 
-        // Gizmo triangles rendered on top (no depth test).
-        glDisable(GL_DEPTH_TEST);
-        updateGizmo(vp, camPos, pixelW, pixelH);
-        glBindVertexArray(gizmoVao);
-        glDrawArrays(GL_TRIANGLES, 0, gizmoVertexCount);
-        glBindVertexArray(0);
+            // Lines (grid + gizmo)
+            Matrix4f vp = new Matrix4f(proj).mul(view);
+            shader.setUniform("uMvp", vp);
+            updateLines();
+            glBindVertexArray(linesVao);
+            glDrawArrays(GL_LINES, 0, linesVertexCount);
 
-        shader.unbind();
+            // Gizmo triangles rendered on top (no depth test).
+            glDisable(GL_DEPTH_TEST);
+            updateGizmo(vp, camPos, pixelW, pixelH);
+            glBindVertexArray(gizmoVao);
+            glDrawArrays(GL_TRIANGLES, 0, gizmoVertexCount);
 
-        Framebuffer.unbind(restoreViewportW, restoreViewportH);
+            shader.unbind();
+        } finally {
+            glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+            glViewport(prevViewportX, prevViewportY, prevViewportW, prevViewportH);
+
+            if (prevDepthTest) {
+                glEnable(GL_DEPTH_TEST);
+            } else {
+                glDisable(GL_DEPTH_TEST);
+            }
+
+            glUseProgram(prevProgram);
+            if (prevVao != 0) {
+                glBindVertexArray(prevVao);
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, prevArrayBuffer);
+        }
     }
 
     private void updateLines() {
@@ -304,9 +347,24 @@ public final class Viewport3D implements AutoCloseable {
     }
 
     private FloatBuffer buildGizmoBuffer(Matrix4f viewProj, Vector3f cameraPos, int pixelW, int pixelH) {
-        // Upper bound: each axis writes ribbon quad (6) + head tri (3), plus center quad (6).
-        int maxVerts = (3 * (6 + 3)) + 6;
-        FloatBuffer fb = BufferUtils.createFloatBuffer(maxVerts * 6);
+        // Upper bound estimation for TranslateGizmo3D.writeTriangles().
+        // Vertex format: pos.xyz + color.rgb (6 floats per vertex).
+        //
+        // Per axis:
+        // - ribbon quad: 6 verts
+        // - cone: segments * 3 verts
+        // - optional outline duplicates both (another 6 + segments*3).
+        // Plus plane handles (3 quads) + center quad, each optionally outlined.
+        final int coneSegments = 12; // Must match TranslateGizmo3D.writeAxis()
+        boolean hasOutline = gizmo.style() != null && gizmo.style().outlineWidthPx > 0.0f;
+        int outlineMul = hasOutline ? 2 : 1;
+
+        int axisVerts = outlineMul * (6 + coneSegments * 3);
+        int planeVerts = outlineMul * (3 * 6);
+        int centerVerts = outlineMul * 6;
+
+        int maxVerts = axisVerts * 3 + planeVerts + centerVerts + 32; // slack
+        FloatBuffer fb = BufferUtils.createFloatBuffer(Math.max(1, maxVerts * 6));
         gizmo.writeTriangles(fb, viewProj, cameraPos, 0, 0, pixelW, pixelH, objectPos);
         fb.flip();
         gizmoVertexCount = fb.remaining() / 6;
