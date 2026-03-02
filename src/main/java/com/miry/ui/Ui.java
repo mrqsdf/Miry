@@ -1,16 +1,16 @@
 package com.miry.ui;
 
 import com.miry.graphics.Texture;
+import com.miry.ui.component.*;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
 import org.joml.Vector2f;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.BiConsumer;
+
+import static com.miry.ui.util.MathUtils.clamp01;
 
 /**
  * Immediate-mode UI (IMUI) helper for rapid prototyping and layout-driven panels.
@@ -193,6 +193,88 @@ public final class Ui {
         return clicked;
     }
 
+    //todo add doc
+    public boolean button(UiRenderer r, ButtonComponent component) {
+        TextComponent labelComp = component.getLabel();
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(labelComp, components);
+        int id = id(component.getId());
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        boolean clicked = buttonAction(hovered, id);
+        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+        int bg = Theme.lerpArgb(component.getBgColor(this), component.getHoverColor(this), hoverT);
+        if (activeId == id) {
+            bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
+        }
+
+        int outline = Theme.toArgb(theme.widgetOutline);
+        if (theme.skins.widget != null) {
+            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
+        } else {
+            float radius = theme.design.radius_sm;
+            int border = theme.design.border_thin;
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
+        }
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x + 10;
+        drawTextComponents(r, components, x, baselineY);
+        if (clicked && component.getOnClick() != null) {
+            component.getOnClick().run();
+        }
+
+        return clicked;
+    }
+
+    private boolean button(UiRenderer r, ButtonComponent component, Rect rect) {
+        TextComponent labelComp = component.getLabel();
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(labelComp, components);
+        int id = id(component.getId());
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        boolean clicked = buttonAction(hovered, id);
+        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+        int bg = Theme.lerpArgb(component.getBgColor(this), component.getHoverColor(this), hoverT);
+        if (activeId == id) {
+            bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
+        }
+
+        int outline = Theme.toArgb(theme.widgetOutline);
+        if (theme.skins.widget != null) {
+            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
+        } else {
+            float radius = theme.design.radius_sm;
+            int border = theme.design.border_thin;
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
+        }
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x + 10;
+        drawTextComponents(r, components, x, baselineY);
+        if (clicked && component.getOnClick() != null) {
+            component.getOnClick().run();
+        }
+
+        return clicked;
+    }
+
+    private boolean buttonAction(boolean hovered, int id) {
+        boolean clicked = false;
+        if (hovered) {
+            hotId = id;
+        }
+        if (hovered && input.mousePressed()) {
+            activeId = id;
+        }
+        if (activeId == id && hovered && input.mouseReleased()) {
+            clicked = true;
+            activeId = 0;
+        }
+        if (activeId == id && input.mouseReleased() && !hovered) {
+            activeId = 0;
+        }
+        return clicked;
+    }
+
     /**
      * Draws a toggle switch / checkbox.
      *
@@ -236,6 +318,61 @@ public final class Ui {
         r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
         float baselineY = r.baselineForBox(rect.y, rect.h);
         r.drawText(label, rect.x + 6 + box + 10, baselineY, Theme.toArgb(theme.text));
+        return value;
+    }
+
+    //todo add doc
+    public boolean toggle(UiRenderer r, ToggleComponent component) {
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        return toggle(r, component, rect);
+    }
+
+    private boolean toggle(UiRenderer r, ToggleComponent component, Rect rect) {
+        int id = id(component.getId());
+        boolean value = component.isToggled();
+        boolean changed = false;
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        if (hovered) {
+            hotId = id;
+        }
+        if (hovered && input.mousePressed()) {
+            activeId = id;
+        }
+        if (activeId == id && hovered && input.mouseReleased()) {
+            value = !value;
+            changed = true;
+            activeId = 0;
+        }
+        if (activeId == id && input.mouseReleased() && !hovered) {
+            activeId = 0;
+        }
+
+        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+        int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
+        int outline = Theme.toArgb(theme.widgetOutline);
+        if (theme.skins.widget != null) {
+            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
+        } else {
+            float radius = theme.design.radius_sm;
+            int border = theme.design.border_thin;
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
+        }
+
+        int box = rect.h - 10;
+        float boxR = Math.min(3.0f, theme.design.radius_sm);
+        int boxFill = component.getToggleColor(this).getArgb();
+        r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
+
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(component.getLabel(), components);
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x + 6 + box + 10;
+        drawTextComponents(r, components, x, baselineY);
+
+        if (changed && component.getOnChange() != null) {
+            component.getOnChange().accept(value);
+        }
+
         return value;
     }
 
@@ -349,6 +486,68 @@ public final class Ui {
         return value;
     }
 
+    //todo add doc
+    public float sliderFloat(UiRenderer r, SliderComponent component) {
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        return sliderFloat(r, component, rect);
+    }
+
+    private float sliderFloat(UiRenderer r, SliderComponent component, Rect rect) {
+        TextComponent labelComp = component.getLabel();
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(labelComp, components);
+        int id = id(component.getId());
+        float min = component.getMin();
+        float max = component.getMax();
+        float value = component.getValue();
+        boolean changed = false;
+
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        if (hovered) {
+            hotId = id;
+        }
+        if (hovered && input.mousePressed()) {
+            activeId = id;
+        }
+        if (activeId == id && input.mouseDown()) {
+            float t = (mouse.x - rect.x) / rect.w;
+            t = clamp01(t);
+            value = min + (max - min) * t;
+            changed = true;
+        }
+        if (activeId == id && input.mouseReleased()) {
+            activeId = 0;
+        }
+
+        float hoverT = anim(id).step((hovered || activeId == id) ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+        int bg = Theme.lerpArgb(component.getBackgroundColor(this), component.getHoverColor(this), hoverT);
+        int outline = Theme.toArgb(theme.widgetOutline);
+        if (theme.skins.widget != null) {
+            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
+        } else {
+            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
+        }
+
+        float t = (value - min) / (max - min);
+        t = clamp01(t);
+        float fillW = rect.w * t;
+        int fill = component.getActiveColor(this).getArgb();
+        float fillRadius = Math.max(0.0f, theme.design.radius_sm - 1);
+        if (fillW > 1.0f) {
+            r.drawRoundedRect(rect.x + 1, rect.y + 1, Math.max(0.0f, fillW - 2.0f), rect.h - 2, fillRadius, fill);
+        }
+
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x + 10;
+        drawTextComponents(r, components, x, baselineY);
+
+        if (changed && component.getOnChange() != null) {
+            component.getOnChange().accept(value);
+        }
+
+        return value;
+    }
+
     /**
      * Draws an image.
      *
@@ -365,6 +564,17 @@ public final class Ui {
         r.drawTexturedRect(texture, rect.x, rect.y, iw, ih, tintArgb);
     }
 
+    public void image(UiRenderer r, TextureComponent component) {
+        Rect rect = nextRect(component.getHeight());
+        image(r, component, rect);
+    }
+
+    private void image(UiRenderer r, TextureComponent component, Rect rect) {
+        int iw = Math.min(component.getWidth(), rect.w);
+        int ih = Math.min(component.getHeight(), rect.h);
+        r.drawTexturedRect(component.getTexture(), rect.x, rect.y, iw, ih, component.getTintArgb());
+    }
+
     public void label(UiRenderer r, String text, boolean muted) {
         Rect rect = nextRect(theme.tokens.itemHeight);
         int color = Theme.toArgb(muted ? theme.textMuted : theme.text);
@@ -372,14 +582,251 @@ public final class Ui {
         r.drawText(text, rect.x, baselineY, color);
     }
 
+    //todo add doc
+
+    public void label(UiRenderer r, TextComponent text) {
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(text, components);
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x;
+        drawTextComponents(r, components, x, baselineY);
+    }
+
+    private void label(UiRenderer r, TextComponent text, Rect rect) {
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(text, components);
+        float baselineY = r.baselineForBox(rect.y, rect.h);
+        int x = rect.x;
+        drawTextComponents(r, components, x, baselineY);
+    }
+
+    //todo add doc
+    private void collectTextComponents(TextComponent text, List<TextComponent> components) {
+        components.add(text);
+        for (Component child : text.getChildren()) {
+            if (child instanceof TextComponent textComponent) {
+                collectTextComponents(textComponent, components);
+            }
+        }
+    }
+
+    private int drawTextComponents(UiRenderer r, List<TextComponent> components, int x, float y) {
+        int currentX = x;
+        for (TextComponent comp : components) {
+            int color = comp.getThemeId() != null ? theme.getColor(comp.getThemeId()).getArgb() : comp.getColor(this).getArgb();
+            r.drawText(comp.getText(), currentX, y, color);
+            currentX += (int) (r.measureText(comp.getText()) + 4);
+        }
+        return currentX;
+    }
+
+    //todo add doc
+    public void renderComponent(UiRenderer r, Component component) {
+        component.render(this, r);
+    }
+
+    public void grid(UiRenderer r, GridComponent component) {
+
+        pushId(component.getId());
+
+        Component[][] cells = component.getGrid();
+        if (cells == null || cells.length == 0) {
+            popId();
+            return;
+        }
+
+        final int rows = cells.length;
+
+        int cols = 0;
+        for (Component[] row : cells) {
+            if (row != null) cols = Math.max(cols, row.length);
+        }
+        if (cols <= 0) {
+            popId();
+            return;
+        }
+
+        // "CSS gap" (use theme spacing for now)
+        final int gap = Math.max(0, theme.tokens.itemSpacing);
+
+        // "row height" default (until GridComponent exposes something like getRowHeight())
+        final int rowH = Math.max(1, component.getCellHeight());
+
+        // Grid origin (current cursor position, like flow layout)
+        final int startX = cursorX;
+        final int startY = cursorY;
+
+        // Column width distribution (equal columns for now)
+        final int totalGapW = gap * (cols - 1);
+        final int colW = Math.max(1, (contentW - totalGapW) / cols);
+
+        // Precompute cell rects
+        Rect[][] rects = new Rect[rows][cols];
+        for (int rr = 0; rr < rows; rr++) {
+            for (int cc = 0; cc < cols; cc++) {
+                int x = startX + cc * (colW + gap);
+                int y = startY + rr * (rowH + gap);
+                rects[rr][cc] = rect(x, y, colW, rowH);
+            }
+        }
+
+        // Collect spans by component instance (same reference)
+        Map<Component, int[]> bounds = new IdentityHashMap<>();
+        for (int rr = 0; rr < rows; rr++) {
+            Component[] row = cells[rr];
+            for (int cc = 0; cc < cols; cc++) {
+                Component c = (row != null && cc < row.length) ? row[cc] : null;
+                if (c == null) continue;
+                int[] b = bounds.get(c);
+                if (b == null) {
+                    // minR, minC, maxR, maxC
+                    b = new int[]{rr, cc, rr, cc};
+                    bounds.put(c, b);
+                } else {
+                    b[0] = Math.min(b[0], rr);
+                    b[1] = Math.min(b[1], cc);
+                    b[2] = Math.max(b[2], rr);
+                    b[3] = Math.max(b[3], cc);
+                }
+            }
+        }
+
+        // Validate "rectangular span" for each component; otherwise split into per-cell draws.
+        Set<Component> nonRectangular = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Map.Entry<Component, int[]> e : bounds.entrySet()) {
+            Component c = e.getKey();
+            int[] b = e.getValue();
+            int minR = b[0], minC = b[1], maxR = b[2], maxC = b[3];
+
+            boolean ok = true;
+            for (int rr = minR; rr <= maxR && ok; rr++) {
+                Component[] row = cells[rr];
+                for (int cc = minC; cc <= maxC; cc++) {
+                    Component in = (row != null && cc < row.length) ? row[cc] : null;
+                    if (in != c) {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if (!ok) nonRectangular.add(c);
+        }
+
+        boolean[][] consumed = new boolean[rows][cols];
+
+        // Render grid
+        for (int rr = 0; rr < rows; rr++) {
+            Component[] row = cells[rr];
+
+            for (int cc = 0; cc < cols; cc++) {
+                if (consumed[rr][cc]) continue;
+
+                Component c = (row != null && cc < row.length) ? row[cc] : null;
+                if (c == null) continue;
+
+
+                // If component span is non-rectangular, render per cell
+                if (nonRectangular.contains(c)) {
+                    Rect cellR = rects[rr][cc];
+                    consumed[rr][cc] = true;
+
+                    pushId(rr * 73856093 ^ cc * 19349663);
+                    renderComponent(r, c, cellR);
+                    popId();
+                    continue;
+                }
+
+                // Rectangular span
+                int[] b = bounds.get(c);
+                int minR = b[0], minC = b[1], maxR = b[2], maxC = b[3];
+
+                // Only draw at top-left of the span
+                if (rr != minR || cc != minC) {
+                    consumed[rr][cc] = true;
+                    continue;
+                }
+
+                // Mark consumed area
+                for (int rrr = minR; rrr <= maxR; rrr++) {
+                    for (int ccc = minC; ccc <= maxC; ccc++) {
+                        if (rrr >= 0 && rrr < rows && ccc >= 0 && ccc < cols) {
+                            consumed[rrr][ccc] = true;
+                        }
+                    }
+                }
+
+                Rect a = rects[minR][minC];
+                Rect z = rects[maxR][maxC];
+
+                int spanX = a.x;
+                int spanY = a.y;
+                int spanW = (z.x + z.w) - a.x;
+                int spanH = (z.y + z.h) - a.y;
+
+                Rect spanRect = rect(spanX, spanY, spanW, spanH);
+
+                pushId(minR * 73856093 ^ minC * 19349663);
+                renderComponent(r, c, spanRect);
+                popId();
+            }
+        }
+
+        // Advance cursor like a block layout: total grid height + itemSpacing
+        int gridH = rows * rowH + gap * (rows - 1);
+        cursorY = startY + gridH + theme.tokens.itemSpacing;
+
+        popId();
+    }
+
+    private void renderComponent(UiRenderer r, Component c, Rect rect) {
+        if (c instanceof ButtonComponent bc) {
+            button(r, bc, rect);
+        } else if (c instanceof TextComponent text) {
+            label(r, text, rect);
+        } else if (c instanceof TextureComponent tc) {
+            image(r, tc, rect);
+        } else if (c instanceof SliderComponent sc) {
+            sliderFloat(r, sc, rect);
+        } else if (c instanceof ToggleComponent tc) {
+            toggle(r, tc, rect);
+        } else {
+            // Placeholder for now (Toggle, Slider, Label, custom...)
+            drawPlaceHolder(rect, c, r);
+        }
+    }
+
+    private void drawPlaceHolder(Rect rc, Component c, UiRenderer r) {
+        int bg = Theme.toArgb(theme.widgetBg);
+        int outline = Theme.toArgb(theme.widgetOutline);
+        r.drawRect(rc.x, rc.y, rc.w, rc.h, bg);
+        // tiny outline effect
+        r.drawRect(rc.x, rc.y, rc.w, 1, outline);
+        r.drawRect(rc.x, rc.y + rc.h - 1, rc.w, 1, outline);
+        r.drawRect(rc.x, rc.y, 1, rc.h, outline);
+        r.drawRect(rc.x + rc.w - 1, rc.y, 1, rc.h, outline);
+
+        String name = (c == null) ? "empty" : c.getClass().getSimpleName();
+        float by = r.baselineForBox(rc.y, rc.h);
+        r.drawText(name, rc.x + 6, by, Theme.toArgb(theme.textMuted));
+    }
+
     public void spacer(int pixels) {
         cursorY += Math.max(0, pixels);
     }
 
     public void separator(UiRenderer r) {
-        spacer(2);
-        r.drawRect(contentX, cursorY, contentW, 1, Theme.toArgb(theme.widgetOutline));
-        spacer(theme.tokens.itemSpacing);
+        separator(r, Theme.toColor(theme.widgetOutline), 1);
+    }
+
+    public void seperator(UiRenderer r, Color color) {
+        separator(r, color, 1);
+    }
+
+    public void separator(UiRenderer r, Color color, int thickness) {
+        spacer(thickness / 2);
+        r.drawRect(contentX, cursorY, contentW, thickness, color.getArgb());
+        spacer(thickness / 2);
     }
 
     private static void drawBevelButton(UiRenderer r,
@@ -414,6 +861,10 @@ public final class Ui {
         Rect r = new Rect(cursorX, cursorY, contentW, h);
         cursorY += h + theme.tokens.itemSpacing;
         return r;
+    }
+
+    private Rect rect(int x, int y, int w, int h) {
+        return new Rect(x, y, w, h);
     }
 
     private int id(String s) {
@@ -469,11 +920,14 @@ public final class Ui {
         }
     }
 
-    private record LayoutState(int contentX, int contentY, int contentW, int cursorX, int cursorY) {}
+    private record LayoutState(int contentX, int contentY, int contentW, int cursorX, int cursorY) {
+    }
 
     private static final class ScrollState {
         private float scrollY;
     }
 
-    public record ScrollArea(UiRenderer renderer, int id, int x, int y, int width, int height, int maxScroll, float scrollY) {}
+    public record ScrollArea(UiRenderer renderer, int id, int x, int y, int width, int height, int maxScroll,
+                             float scrollY) {
+    }
 }
