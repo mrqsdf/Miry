@@ -1,6 +1,10 @@
 package com.miry.ui.theme;
 
+import com.miry.ui.component.Color;
 import org.joml.Vector4f;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Editor-oriented theme containing semantic colors and shared style tokens.
@@ -44,6 +48,8 @@ public final class Theme {
 
     public final Vector4f accent = rgba(76, 154, 255, 255);
     public final Vector4f danger = rgba(220, 80, 80, 255);
+
+    private final Map<String, Color> customColors = new HashMap<>();
 
     private ThemeMode mode = ThemeMode.DARK;
 
@@ -134,9 +140,18 @@ public final class Theme {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
+    public static Color toColor(Vector4f c){
+        return new Color(c);
+    }
+
     public static int lerpArgb(Vector4f a, Vector4f b, float t) {
         float tt = clamp01(t);
         return toArgb(new Vector4f(a).lerp(b, tt));
+    }
+
+    public static int lerpArgb(Color a, Color b, float t) {
+        float tt = clamp01(t);
+        return toArgb(new Vector4f(a.getR(), a.getG(), a.getB(), a.getA()).lerp(new Vector4f(b.getR(), b.getG(), b.getB(), b.getA()), tt));
     }
 
     public static int lerpArgbInt(int argbA, int argbB, float t) {
@@ -182,5 +197,13 @@ public final class Theme {
 
     private static int clamp255(int v) {
         return Math.max(0, Math.min(255, v));
+    }
+
+    public Color getColor(String themeId) {
+        return customColors.get(themeId);
+    }
+
+    public void setCustomColor(String themeId, Color color) {
+        customColors.put(themeId, color);
     }
 }
