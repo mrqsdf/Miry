@@ -86,6 +86,9 @@ public final class Ui {
                 .setScrollY(input.scrollY());
         mouse.set(this.input.mousePos());
         hotId = 0;
+        if (activeId != 0 && !this.input.mouseDown() && !this.input.mouseReleased()) {
+            activeId = 0;
+        }
     }
 
     /**
@@ -112,9 +115,6 @@ public final class Ui {
      * Ends the current panel region.
      */
     public void endPanel() {
-        if (input.mouseReleased() && activeId != 0) {
-            activeId = 0;
-        }
     }
 
     /**
