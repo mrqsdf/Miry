@@ -1,5 +1,6 @@
 package com.miry.ui.theme;
 
+import com.miry.ui.component.Color;
 import org.joml.Vector4f;
 
 /**
@@ -28,9 +29,9 @@ public final class StateColors {
      */
     public static int computeBackground(Theme theme, float hoverT, float pressT, WidgetVariant variant) {
         ColorPalette p = theme.palette;
-        Vector4f baseColor;
-        Vector4f hoverColor;
-        Vector4f pressColor;
+        Color baseColor;
+        Color hoverColor;
+        Color pressColor;
 
         switch (variant) {
             case PRIMARY:
@@ -72,11 +73,11 @@ public final class StateColors {
         }
 
         // Interpolate: base -> hover -> press
-        Vector4f color = new Vector4f(baseColor);
-        color.lerp(hoverColor, clamp01(hoverT));
-        color.lerp(pressColor, clamp01(pressT));
+        Vector4f color = baseColor.toVector4f();
+        color.lerp(hoverColor.toVector4f(), clamp01(hoverT));
+        color.lerp(pressColor.toVector4f(), clamp01(pressT));
 
-        return Theme.toArgb(color);
+        return (Theme.toArgb(color));
     }
 
     /**
@@ -87,15 +88,15 @@ public final class StateColors {
 
         // Focus overrides everything
         if (focusT > 0.01f) {
-            Vector4f focusColor = theme.focusRing;
-            Vector4f baseColor = theme.widgetOutline;
+            Vector4f focusColor = theme.focusRing.toVector4f();
+            Vector4f baseColor = theme.widgetOutline.toVector4f();
             Vector4f blended = new Vector4f(baseColor).lerp(focusColor, clamp01(focusT));
             return Theme.toArgb(blended);
         }
 
         // Otherwise, use variant colors
-        Vector4f baseColor = theme.widgetOutline;
-        Vector4f hoverColor;
+        Color baseColor = theme.widgetOutline;
+        Color hoverColor;
 
         switch (variant) {
             case PRIMARY:
@@ -112,8 +113,8 @@ public final class StateColors {
                 break;
         }
 
-        Vector4f color = new Vector4f(baseColor);
-        color.lerp(hoverColor, clamp01(hoverT));
+        Vector4f color = baseColor.toVector4f();
+        color.lerp(hoverColor.toVector4f(), clamp01(hoverT));
         return Theme.toArgb(color);
     }
 
@@ -128,14 +129,14 @@ public final class StateColors {
             case DANGER:
             case SUCCESS:
                 // Light text on colored backgrounds
-                return Theme.toArgb(p.white);
+                return (p.white.getArgb());
 
             case GHOST:
             case SECONDARY:
             case DEFAULT:
             default:
                 // Use theme text color
-                return Theme.toArgb(theme.text);
+                return (theme.text.getArgb());
         }
     }
 
@@ -147,13 +148,13 @@ public final class StateColors {
 
         switch (variant) {
             case DANGER:
-                return Theme.toArgb(p.red500);
+                return (p.red500.getArgb());
             case SUCCESS:
-                return Theme.toArgb(p.green500);
+                return (p.green500.getArgb());
             case PRIMARY:
             case DEFAULT:
             default:
-                return Theme.toArgb(theme.focusRing);
+                return (theme.focusRing.getArgb());
         }
     }
 

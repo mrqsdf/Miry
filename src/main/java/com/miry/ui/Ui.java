@@ -179,7 +179,7 @@ public final class Ui {
             bg = Theme.lerpArgb(theme.widgetHover, theme.widgetActive, 0.35f);
         }
 
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -188,7 +188,7 @@ public final class Ui {
             drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
         }
         float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 10, baselineY, Theme.toArgb(theme.text));
+        r.drawText(label, rect.x + 10, baselineY, theme.text.getArgb());
 
         return clicked;
     }
@@ -208,7 +208,7 @@ public final class Ui {
             bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
         }
 
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -239,7 +239,7 @@ public final class Ui {
             bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
         }
 
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -303,7 +303,7 @@ public final class Ui {
 
         float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
         int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -314,10 +314,10 @@ public final class Ui {
 
         int box = rect.h - 10;
         float boxR = Math.min(3.0f, theme.design.radius_sm);
-        int boxFill = value ? Theme.toArgb(theme.widgetActive) : Theme.toArgb(theme.widgetOutline);
+        int boxFill = value ? theme.widgetActive.getArgb() : theme.widgetOutline.getArgb();
         r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
         float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 6 + box + 10, baselineY, Theme.toArgb(theme.text));
+        r.drawText(label, rect.x + 6 + box + 10, baselineY, theme.text.getArgb());
         return value;
     }
 
@@ -349,7 +349,7 @@ public final class Ui {
 
         float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
         int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -465,7 +465,7 @@ public final class Ui {
 
         float hoverT = anim(id).step((hovered || activeId == id) ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
         int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -475,14 +475,14 @@ public final class Ui {
         float t = (value - min) / (max - min);
         t = clamp01(t);
         float fillW = rect.w * t;
-        int fill = Theme.toArgb(theme.widgetActive);
+        int fill = theme.widgetActive.getArgb();
         float fillRadius = Math.max(0.0f, theme.design.radius_sm - 1);
         if (fillW > 1.0f) {
             r.drawRoundedRect(rect.x + 1, rect.y + 1, Math.max(0.0f, fillW - 2.0f), rect.h - 2, fillRadius, fill);
         }
 
         float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 10, baselineY, Theme.toArgb(theme.text));
+        r.drawText(label, rect.x + 10, baselineY, theme.text.getArgb());
         return value;
     }
 
@@ -521,7 +521,7 @@ public final class Ui {
 
         float hoverT = anim(id).step((hovered || activeId == id) ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
         int bg = Theme.lerpArgb(component.getBackgroundColor(this), component.getHoverColor(this), hoverT);
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int outline = theme.widgetOutline.getArgb();
         if (theme.skins.widget != null) {
             theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
         } else {
@@ -577,7 +577,7 @@ public final class Ui {
 
     public void label(UiRenderer r, String text, boolean muted) {
         Rect rect = nextRect(theme.tokens.itemHeight);
-        int color = Theme.toArgb(muted ? theme.textMuted : theme.text);
+        int color = muted ? theme.textMuted.getArgb() : theme.text.getArgb();
         float baselineY = r.baselineForBox(rect.y, rect.h);
         r.drawText(text, rect.x, baselineY, color);
     }
@@ -797,8 +797,8 @@ public final class Ui {
     }
 
     private void drawPlaceHolder(Rect rc, Component c, UiRenderer r) {
-        int bg = Theme.toArgb(theme.widgetBg);
-        int outline = Theme.toArgb(theme.widgetOutline);
+        int bg = theme.widgetBg.getArgb();
+        int outline = theme.widgetOutline.getArgb();
         r.drawRect(rc.x, rc.y, rc.w, rc.h, bg);
         // tiny outline effect
         r.drawRect(rc.x, rc.y, rc.w, 1, outline);
@@ -808,7 +808,7 @@ public final class Ui {
 
         String name = (c == null) ? "empty" : c.getClass().getSimpleName();
         float by = r.baselineForBox(rc.y, rc.h);
-        r.drawText(name, rc.x + 6, by, Theme.toArgb(theme.textMuted));
+        r.drawText(name, rc.x + 6, by, theme.textMuted.getArgb());
     }
 
     public void spacer(int pixels) {
@@ -816,7 +816,7 @@ public final class Ui {
     }
 
     public void separator(UiRenderer r) {
-        separator(r, Theme.toColor(theme.widgetOutline), 1);
+        separator(r, theme.widgetOutline, 1);
     }
 
     public void seperator(UiRenderer r, Color color) {

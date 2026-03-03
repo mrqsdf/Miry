@@ -28,6 +28,7 @@ import com.miry.ui.widgets.EyedropperButton;
 import com.miry.ui.widgets.ToastManager;
 import com.miry.ui.widgets.Viewport3D;
 import org.joml.Vector2f;
+import org.joml.Vector4f;
 
 import java.nio.ByteBuffer;
 
@@ -72,7 +73,8 @@ public final class ShowcaseDemoApplication extends Application {
     private InputPanel inputPanel;
     private WidgetsShowcasePanel widgetsPanel;
     private PrimitivesPanel primitivesPanel;
-    private SimpleNewWidgetsPanel newWidgetsPanel;
+
+    private ComponentPanel componentPanel;
 
     private double lastInteractionTime;
     private float prevScrollY;
@@ -112,16 +114,15 @@ public final class ShowcaseDemoApplication extends Application {
         nodeGraphPanel = new NodeGraphPanel(nodeGraph);
 
         // Create new widgets demo panel
-        newWidgetsPanel = new SimpleNewWidgetsPanel();
 
         // Layout:
         // Left: primitives + new widgets
         primitivesPanel = new PrimitivesPanel();
         LeafNode primitives = new LeafNode(primitivesPanel);
         primitives.setBackgroundArgb(Theme.toArgb(theme.panelBg));
-        LeafNode newWidgetsLeaf = new LeafNode(newWidgetsPanel);
-        newWidgetsLeaf.setBackgroundArgb(Theme.toArgb(theme.panelBg));
-        SplitNode leftCol = new SplitNode(primitives, newWidgetsLeaf, true, 0.52f);
+        LeafNode hello = new LeafNode(new ComponentPanel());
+        hello.setBackgroundArgb(Theme.toArgb(theme.panelBg));
+        SplitNode leftCol = new SplitNode(hello, primitives , true, 0.5f);
 
         // Center: viewport + input panel
         LeafNode viewportLeaf = new LeafNode(viewportPanel);
@@ -205,9 +206,6 @@ public final class ShowcaseDemoApplication extends Application {
         if (widgetsPanel != null) {
             widgetsPanel.update(dt);
         }
-        if (newWidgetsPanel != null) {
-            newWidgetsPanel.update(dt);
-        }
         
         // Input state update
         Vector2f mp = host.getMousePos(); // Re-read or reuse mx/my
@@ -239,8 +237,7 @@ public final class ShowcaseDemoApplication extends Application {
         windowManager.update(uiContext, input, w, h);
         boolean block = windowManager.blocksInput()
             || uiContext.pointer().hasCaptured()
-            || (widgetsPanel != null && widgetsPanel.blocksBackgroundInput())
-            || (newWidgetsPanel != null && newWidgetsPanel.blocksBackgroundInput());
+            || (widgetsPanel != null && widgetsPanel.blocksBackgroundInput());
         if (!block) {
             dockSpace.update(input);
         }
@@ -296,18 +293,12 @@ public final class ShowcaseDemoApplication extends Application {
                 if (!blockedByWindow && widgetsPanel != null) {
                     widgetsPanel.handleKey(uiContext, keyEvent);
                 }
-                if (!blockedByWindow && newWidgetsPanel != null) {
-                    newWidgetsPanel.handleKey(uiContext, keyEvent);
-                }
             } else if (event instanceof TextInputEvent textEvent) {
                 if (!blockedByWindow && inputPanel != null) {
                     inputPanel.handleTextInput(uiContext, textEvent);
                 }
                 if (!blockedByWindow && widgetsPanel != null) {
                     widgetsPanel.handleTextInput(uiContext, textEvent);
-                }
-                if (!blockedByWindow && newWidgetsPanel != null) {
-                    newWidgetsPanel.handleTextInput(uiContext, textEvent);
                 }
             }
         }
@@ -330,7 +321,8 @@ public final class ShowcaseDemoApplication extends Application {
 
         uiFramebuffer.ensureSize(fbW, fbH);
         try (Framebuffer.Binding ignored = uiFramebuffer.bindScoped()) {
-            org.lwjgl.opengl.GL11.glClearColor(ui.theme().windowBg.x, ui.theme().windowBg.y, ui.theme().windowBg.z, 1.0f);
+            Vector4f bg = ui.theme().windowBg.toVector4f();
+            org.lwjgl.opengl.GL11.glClearColor(bg.x, bg.y, bg.z, 1.0f);
             org.lwjgl.opengl.GL11.glClear(org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT);
 
             batch.begin(w, h, host.getFramebufferScale());

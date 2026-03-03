@@ -36,12 +36,7 @@ public final class ComponentPanel extends Panel {
                 .setColor(toggle ? new Color(java.awt.Color.GREEN) : new Color(java.awt.Color.GRAY));
 
         ToggleComponent toggleComp = new ToggleComponent(toggleText, toggle)
-                .setToggleColor(toggle ? new Color(java.awt.Color.GREEN) : new Color(java.awt.Color.GRAY))
-                .setOnChange(value -> {
-                    ;
-                    toggle = value;
-                    System.out.println("Toggle state: " + toggle);
-                });
+                .setToggleColor(toggle ? new Color(java.awt.Color.GREEN) : new Color(java.awt.Color.GRAY));
 
         toggle = ui.toggle(r, toggleComp);
 

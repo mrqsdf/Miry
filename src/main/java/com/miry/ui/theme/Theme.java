@@ -27,27 +27,27 @@ public final class Theme {
     public final IconAtlas icons = new IconAtlas();
     public final WidgetSkins skins = new WidgetSkins();
 
-    public final Vector4f windowBg = rgba(18, 18, 22, 255);
-    public final Vector4f panelBg = rgba(28, 28, 34, 255);
-    public final Vector4f headerBg = rgba(20, 20, 24, 255);
-    public final Vector4f headerLine = rgba(46, 46, 56, 255);
+    public final Color windowBg = rgba(18, 18, 22, 255);
+    public final Color panelBg = rgba(28, 28, 34, 255);
+    public final Color headerBg = rgba(20, 20, 24, 255);
+    public final Color headerLine = rgba(46, 46, 56, 255);
 
-    public final Vector4f widgetBg = rgba(34, 34, 42, 255);
-    public final Vector4f widgetHover = rgba(54, 54, 66, 255);
-    public final Vector4f widgetActive = rgba(76, 154, 255, 255);
-    public final Vector4f widgetOutline = rgba(55, 55, 66, 255);
+    public final Color widgetBg = rgba(34, 34, 42, 255);
+    public final Color widgetHover = rgba(54, 54, 66, 255);
+    public final Color widgetActive = rgba(76, 154, 255, 255);
+    public final Color widgetOutline = rgba(55, 55, 66, 255);
 
-    public final Vector4f text = rgba(230, 230, 240, 255);
-    public final Vector4f textMuted = rgba(175, 175, 190, 255);
+    public final Color text = rgba(230, 230, 240, 255);
+    public final Color textMuted = rgba(175, 175, 190, 255);
 
-    public final Vector4f disabledFg = rgba(135, 135, 150, 255);
-    public final Vector4f disabledBg = rgba(26, 26, 32, 255);
+    public final Color disabledFg = rgba(135, 135, 150, 255);
+    public final Color disabledBg = rgba(26, 26, 32, 255);
 
-    public final Vector4f shadow = rgba(0, 0, 0, 120);
-    public final Vector4f focusRing = rgba(76, 154, 255, 255);
+    public final Color shadow = rgba(0, 0, 0, 120);
+    public final Color focusRing = rgba(76, 154, 255, 255);
 
-    public final Vector4f accent = rgba(76, 154, 255, 255);
-    public final Vector4f danger = rgba(220, 80, 80, 255);
+    public final Color accent = rgba(76, 154, 255, 255);
+    public final Color danger = rgba(220, 80, 80, 255);
 
     private final Map<String, Color> customColors = new HashMap<>();
 
@@ -128,8 +128,8 @@ public final class Theme {
         focusRing.set(ColorPalette.rgba(46, 124, 235, 204));
     }
 
-    public static Vector4f rgba(int r, int g, int b, int a) {
-        return new Vector4f(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+    public static Color rgba(int r, int g, int b, int a) {
+        return new Color(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
     }
 
     public static int toArgb(Vector4f c) {
@@ -137,6 +137,14 @@ public final class Theme {
         int r = clamp255(Math.round(c.x * 255.0f));
         int g = clamp255(Math.round(c.y * 255.0f));
         int b = clamp255(Math.round(c.z * 255.0f));
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    public static int toArgb(Color c) {
+        int a = clamp255(Math.round(c.getA() * 255.0f));
+        int r = clamp255(Math.round(c.getR() * 255.0f));
+        int g = clamp255(Math.round(c.getG() * 255.0f));
+        int b = clamp255(Math.round(c.getB() * 255.0f));
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 

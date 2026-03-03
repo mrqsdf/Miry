@@ -1,6 +1,7 @@
 package com.miry.demo;
 
 import com.miry.ui.PanelContext;
+import com.miry.ui.component.Color;
 import com.miry.ui.panels.Panel;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.DesignTokens;
@@ -95,13 +96,13 @@ public class TokenShowcasePanel extends Panel {
 
     private int renderSection(UiRenderer r, Theme theme, String title, int x, int y) {
         float baselineY = y + r.ascent();
-        r.drawText(title, x, baselineY, Theme.toArgb(theme.text));
+        r.drawText(title, x, baselineY, theme.text.getArgb());
         return y + (int)r.lineHeight() + theme.design.space_md;
     }
 
     private int renderToken(UiRenderer r, Theme theme, String name, String value, int x, int y, int lineHeight) {
-        int labelColor = Theme.toArgb(theme.text);
-        int valueColor = Theme.toArgb(theme.textMuted);
+        int labelColor = theme.text.getArgb();
+        int valueColor = theme.textMuted.getArgb();
         float baselineY = y + r.ascent();
         r.drawText(name, x, baselineY, labelColor);
         r.drawText(value, x + 180, baselineY, valueColor);
@@ -109,8 +110,8 @@ public class TokenShowcasePanel extends Panel {
     }
 
     private int renderRadiusToken(UiRenderer r, Theme theme, String name, int radius, int x, int y, int lineHeight) {
-        int labelColor = Theme.toArgb(theme.text);
-        int valueColor = Theme.toArgb(theme.textMuted);
+        int labelColor = theme.text.getArgb();
+        int valueColor = theme.textMuted.getArgb();
         float baselineY = y + r.ascent();
         r.drawText(name, x, baselineY, labelColor);
         r.drawText(radius + "px", x + 180, baselineY, valueColor);
@@ -120,7 +121,7 @@ public class TokenShowcasePanel extends Panel {
         int boxX = x + 280;
         int boxY = y - 2;
         float rr = Math.min(radius, boxSize * 0.5f);
-        int fill = Theme.toArgb(theme.widgetActive);
+        int fill = theme.widgetActive.getArgb();
         int top = Theme.lightenArgb(fill, 0.10f);
         int bottom = Theme.darkenArgb(fill, 0.10f);
         r.drawRoundedRect(boxX, boxY, boxSize, boxSize, rr, top, top, bottom, bottom);
@@ -129,8 +130,8 @@ public class TokenShowcasePanel extends Panel {
     }
 
     private int renderHeightToken(UiRenderer r, Theme theme, String name, int height, int x, int y, int lineHeight) {
-        int labelColor = Theme.toArgb(theme.text);
-        int valueColor = Theme.toArgb(theme.textMuted);
+        int labelColor = theme.text.getArgb();
+        int valueColor = theme.textMuted.getArgb();
         float baselineY = y + r.ascent();
         r.drawText(name, x, baselineY, labelColor);
         r.drawText(height + "px", x + 180, baselineY, valueColor);
@@ -139,7 +140,7 @@ public class TokenShowcasePanel extends Panel {
         int barWidth = 200;
         int barX = x + 280;
         int barY = y - 2;
-        int bg = Theme.toArgb(theme.widgetBg);
+        int bg = theme.widgetBg.getArgb();
         int top = Theme.lightenArgb(bg, 0.04f);
         int bottom = Theme.darkenArgb(bg, 0.04f);
         r.drawRoundedRect(barX, barY, barWidth, height, Math.min(theme.design.radius_sm, height * 0.5f), top, top, bottom, bottom);
@@ -147,8 +148,8 @@ public class TokenShowcasePanel extends Panel {
         return y + lineHeight + theme.design.space_xs;
     }
 
-    private int renderColorSwatch(UiRenderer r, Theme theme, String name, Vector4f color, int x, int y, int lineHeight) {
-        int labelColor = Theme.toArgb(theme.text);
+    private int renderColorSwatch(UiRenderer r, Theme theme, String name, Color color, int x, int y, int lineHeight) {
+        int labelColor = theme.text.getArgb();
         float baselineY = y + r.ascent();
         r.drawText(name, x, baselineY, labelColor);
 
@@ -156,14 +157,14 @@ public class TokenShowcasePanel extends Panel {
         int swatchSize = 20;
         int swatchX = x + 180;
         int swatchY = y - 2;
-        r.drawRect(swatchX, swatchY, swatchSize, swatchSize, Theme.toArgb(color));
+        r.drawRect(swatchX, swatchY, swatchSize, swatchSize, color.getArgb());
 
         // Show RGB values
-        int rr = Math.round(color.x * 255);
-        int gg = Math.round(color.y * 255);
-        int bb = Math.round(color.z * 255);
+        int rr = Math.round(color.getR() * 255);
+        int gg = Math.round(color.getG() * 255);
+        int bb = Math.round(color.getB() * 255);
         String rgb = String.format("rgb(%d, %d, %d)", rr, gg, bb);
-        r.drawText(rgb, x + 210, baselineY, Theme.toArgb(theme.textMuted));
+        r.drawText(rgb, x + 210, baselineY, theme.textMuted.getArgb());
 
         return y + lineHeight;
     }

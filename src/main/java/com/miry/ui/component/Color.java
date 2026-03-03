@@ -23,10 +23,10 @@ public class Color {
         this.g = g;
         this.b = b;
         this.a = a;
-        int ir = Math.round(r * 255f);
-        int ig = Math.round(g * 255f);
-        int ib = Math.round(b * 255f);
-        int ia = Math.round(a * 255f);
+        int ir = clamp255(Math.round(r * 255f));
+        int ig = clamp255(Math.round(g * 255f));
+        int ib = clamp255(Math.round(b * 255f));
+        int ia = clamp255(Math.round(a * 255f));
         this.argb = (ia << 24) | (ir << 16) | (ig << 8) | ib;
     }
 
@@ -43,10 +43,10 @@ public class Color {
         this.g = color.getGreen() / 255f;
         this.b = color.getBlue() / 255f;
         this.a = color.getAlpha() / 255f;
-        int ir = Math.round(r * 255f);
-        int ig = Math.round(g * 255f);
-        int ib = Math.round(b * 255f);
-        int ia = Math.round(a * 255f);
+        int ir = clamp255(Math.round(r * 255f));
+        int ig = clamp255(Math.round(g * 255f));
+        int ib = clamp255(Math.round(b * 255f));
+        int ia = clamp255(Math.round(a * 255f));
         this.argb = (ia << 24) | (ir << 16) | (ig << 8) | ib;
     }
 
@@ -79,4 +79,20 @@ public class Color {
     }
 
 
+    public Vector4f toVector4f() {
+        return new Vector4f(r, g, b, a);
+    }
+
+    public Color set(Color color){
+        this.argb = color.argb;
+        this.r = color.r;
+        this.g = color.g;
+        this.b = color.b;
+        this.a = color.a;
+        return this;
+    }
+
+    private static int clamp255(int v) {
+        return Math.max(0, Math.min(255, v));
+    }
 }
