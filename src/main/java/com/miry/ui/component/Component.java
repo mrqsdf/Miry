@@ -31,6 +31,8 @@ public class Component {
                 ui.toggle(renderer, (ToggleComponent) child);
             } else if (child instanceof SliderComponent) {
                 ui.sliderFloat(renderer, (SliderComponent) child);
+            } else if (child instanceof GridComponent) {
+                ui.grid(renderer, (GridComponent) child);
             } else {
                 child.render(ui, renderer);
             }
