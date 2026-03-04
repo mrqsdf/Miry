@@ -2,6 +2,9 @@ package com.miry.ui;
 
 import com.miry.graphics.Texture;
 import com.miry.ui.component.*;
+import com.miry.ui.component.graphic.GraphicComponent;
+import com.miry.ui.component.graphic.GraphicDataSeries;
+import com.miry.ui.component.graphic.GraphicUtils;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
@@ -10,6 +13,7 @@ import org.joml.Vector2f;
 import java.util.*;
 import java.util.function.BiConsumer;
 
+import static com.miry.ui.component.graphic.GraphicUtils.*;
 import static com.miry.ui.util.MathUtils.clamp01;
 
 /**
@@ -45,6 +49,7 @@ public final class Ui {
     private int idSeed = 0x1234567;
     private final Deque<Integer> idSeedStack = new ArrayDeque<>();
     private final Deque<LayoutState> layoutStack = new ArrayDeque<>();
+    private final GraphicUtils graphicUtils;
 
     /**
      * Creates a new UI context with the specified theme.
@@ -53,6 +58,7 @@ public final class Ui {
      */
     public Ui(Theme theme) {
         this.theme = Objects.requireNonNull(theme, "theme");
+        this.graphicUtils = new GraphicUtils(theme);
     }
 
     public Theme theme() {
@@ -779,6 +785,9 @@ public final class Ui {
         popId();
     }
 
+    // Update your renderComponent switch to support GraphicComponent.
+// Keep comments in English.
+
     private void renderComponent(UiRenderer r, Component c, Rect rect) {
         if (c instanceof ButtonComponent bc) {
             button(r, bc, rect);
@@ -790,10 +799,121 @@ public final class Ui {
             sliderFloat(r, sc, rect);
         } else if (c instanceof ToggleComponent tc) {
             toggle(r, tc, rect);
+        } else if (c instanceof GraphicComponent gc) {
+            // Render the graphic inside the given rect without breaking external layout.
+            layoutStack.push(new LayoutState(contentX, contentY, contentW, cursorX, cursorY));
+
+            contentX = rect.x;
+            contentY = rect.y;
+            contentW = rect.w;
+            cursorX = rect.x;
+            cursorY = rect.y;
+
+            graphic(r, gc, rect);
+
+            LayoutState prev = layoutStack.pop();
+            contentX = prev.contentX();
+            contentY = prev.contentY();
+            contentW = prev.contentW();
+            cursorX = prev.cursorX();
+            cursorY = prev.cursorY();
+        } else if (c instanceof GridComponent gc) {
+            grid(r, gc);
+        } else if (c instanceof SpacerComponent sp) {
+            spacer(sp);
+        } else if (c instanceof SeparatorComponent sep) {
+            separator(r, sep);
         } else {
-            // Placeholder for now (Toggle, Slider, Label, custom...)
             drawPlaceHolder(rect, c, r);
         }
+    }
+
+    public void group(UiRenderer r, GroupedComponent component) {
+        List<Component> children = component.getChildren();
+        if (children == null || children.isEmpty()) return;
+
+        pushId(component.getId() == null ? "group" : component.getId());
+
+        final int gap = Math.max(0, theme.tokens.itemSpacing);
+
+        final int startX = cursorX;
+        final int startY = cursorY;
+
+        final int lineH = Math.max(1, theme.tokens.itemHeight);
+
+        final int n = children.size();
+
+        int[] desiredW = new int[n];
+        int fixedSum = 0;
+        int flexCount = 0;
+
+        for (int i = 0; i < n; i++) {
+            Component c = children.get(i);
+
+            int w = -1;
+
+            if (c instanceof TextComponent tc) {
+                List<TextComponent> parts = new ArrayList<>();
+                collectTextComponents(tc, parts);
+
+                float width = 0f;
+                for (TextComponent part : parts) {
+                    width += r.measureText(part.getText()) + 4f;
+                }
+                w = Math.max(1, Math.round(width) + 2);
+            } else if (c instanceof TextureComponent) {
+                w = lineH;
+            } else {
+                w = -1;
+            }
+
+            desiredW[i] = w;
+
+            if (w > 0) fixedSum += w;
+            else flexCount++;
+        }
+
+        int totalGap = gap * Math.max(0, n - 1);
+        int available = Math.max(1, contentW - totalGap);
+
+        if (fixedSum > available && fixedSum > 0) {
+            float s = (float) available / (float) fixedSum;
+            fixedSum = 0;
+            for (int i = 0; i < n; i++) {
+                if (desiredW[i] > 0) {
+                    desiredW[i] = Math.max(1, Math.round(desiredW[i] * s));
+                    fixedSum += desiredW[i];
+                }
+            }
+        }
+
+        int remaining = Math.max(0, available - fixedSum);
+        int flexW = (flexCount > 0) ? (remaining / flexCount) : 0;
+        int flexR = (flexCount > 0) ? (remaining % flexCount) : 0;
+
+        int x = startX;
+        for (int i = 0; i < n; i++) {
+            Component c = children.get(i);
+
+            int w = desiredW[i];
+            if (w <= 0) {
+                w = flexW + (flexR > 0 ? 1 : 0);
+                if (flexR > 0) flexR--;
+                w = Math.max(1, w);
+            }
+
+            Rect rc = rect(x, startY, w, lineH);
+
+            pushId(i);
+            renderComponent(r, c, rc);
+            popId();
+
+            x += w + gap;
+        }
+
+        cursorY = startY + lineH + theme.tokens.itemSpacing;
+
+        popId();
     }
 
     private void drawPlaceHolder(Rect rc, Component c, UiRenderer r) {
@@ -811,8 +931,149 @@ public final class Ui {
         r.drawText(name, rc.x + 6, by, theme.textMuted.getArgb());
     }
 
+    public void graphic(UiRenderer r, GraphicComponent component) {
+        // Render as a fixed-size widget that does NOT break the layout flow.
+        // Width is clamped to the available content width, height is respected.
+        pushId(component.getId());
+
+        int w = Math.max(1, Math.min(component.getWidth(), contentW));
+        int h = Math.max(1, component.getHeight());
+
+        Rect rect = rect(cursorX, cursorY, w, h);
+        cursorY += h + theme.tokens.itemSpacing;
+
+        graphic(r, component, rect);
+
+        popId();
+    }
+
+    private void graphic(UiRenderer r, GraphicComponent component, Rect rect) {
+        // High-level layout: Title (top), Plot (center), Legend (right or bottom), Axis labels.
+        // We keep everything inside rect and use clipping to avoid overflowing.
+
+        final int bg = theme.widgetBg.getArgb();
+        final int outline = theme.widgetOutline.getArgb();
+        final int text = theme.text.getArgb();
+        final int textMuted = theme.textMuted.getArgb();
+
+        r.flush();
+        r.pushClip(rect.x, rect.y, rect.w, rect.h);
+
+        // Background and border
+        r.drawRoundedRect(rect.x, rect.y, rect.w, rect.h, theme.design.radius_sm, bg, theme.design.border_thin, outline);
+
+        // Padding inside the chart widget
+        final int pad = Math.max(6, theme.tokens.padding);
+        int x0 = rect.x + pad;
+        int y0 = rect.y + pad;
+        int x1 = rect.x + rect.w - pad;
+        int y1 = rect.y + rect.h - pad;
+
+        // Title area
+        final int titleH = (!isNullOrBlank(component.getTitle())) ? (int) Math.ceil(r.lineHeight() + 6) : 0;
+        if (titleH > 0) {
+            String title = component.getTitle();
+            float tw = r.measureText(title);
+            float tx = x0 + Math.max(0, (x1 - x0 - (int) tw) / 2.0f);
+            float ty = r.baselineForBox(y0, titleH);
+            r.drawText(title, tx, ty, text);
+            y0 += titleH;
+        }
+
+        // Decide legend placement: right if enough width, otherwise bottom
+        final boolean wantLegend = component.isShowLegend();
+        final int legendMinW = 110;
+        final int legendMaxW = 180;
+        final int legendGap = 8;
+
+        int legendW = 0;
+        int legendH = 0;
+        boolean legendRight = false;
+
+        List<GraphicDataSeries> points = component.getDataSeries();
+        int seriesCount = (points == null) ? 0 : points.size();
+
+        if (wantLegend && seriesCount > 0) {
+            int availableW = x1 - x0;
+            // Prefer right legend when there's enough horizontal space
+            if (availableW >= (legendMinW + 220)) {
+                legendRight = true;
+                legendW = clampInt(legendMaxW, legendMinW, Math.max(legendMinW, availableW / 3));
+                legendH = y1 - y0;
+                x1 -= (legendW + legendGap);
+            } else {
+                legendRight = false;
+                legendH = (int) Math.ceil(r.lineHeight() * Math.min(seriesCount, 4) + 14);
+                legendW = x1 - x0;
+                y1 -= (legendH + legendGap);
+            }
+        }
+
+        // Axis label areas
+        final int axisLabelH = (!isNullOrBlank(component.getAxisXLabel())) ? (int) Math.ceil(r.lineHeight() + 4) : 0;
+        final int axisLabelW = (!isNullOrBlank(component.getAxisYLabel())) ? (int) Math.ceil(r.lineHeight() + 4) : 0;
+
+        // Plot area (reserve space for axis labels and tick labels)
+        final int tickLabelPad = 6;
+        final int yTicksW = axisLabelW + 26; // left side for Y values + Y label
+        final int xTicksH = axisLabelH + 22; // bottom for X values + X label
+
+        int plotX0 = x0 + yTicksW;
+        int plotY0 = y0 + 6;
+        int plotX1 = x1 - 6;
+        int plotY1 = y1 - xTicksH;
+
+        // Safety clamp
+        if (plotX1 <= plotX0 + 10 || plotY1 <= plotY0 + 10) {
+            // Not enough space: just draw placeholder message
+            String msg = "Graphic: not enough space";
+            r.drawText(msg, x0, r.baselineForBox(y0, Math.max(1, y1 - y0)), textMuted);
+            r.popClip();
+            return;
+        }
+
+        // Compute scaling based on explicit min/max, or auto-scale from points with padding
+        GraphicUtils.Scale scale = graphicUtils.computeScale(component, points, plotX0, plotY0, plotX1, plotY1);
+
+        // Draw grid (optional) and axes (always)
+        graphicUtils.drawAxesAndGrid(r, component, plotX0, plotY0, plotX1, plotY1, scale);
+
+        // Draw chart by type
+        switch (component.getType()) {
+            case LINE -> graphicUtils.drawLineChart(r, component, plotX0, plotY0, plotX1, plotY1, scale, false);
+            case AREA -> graphicUtils.drawLineChart(r, component, plotX0, plotY0, plotX1, plotY1, scale, true);
+            case COLUMN -> graphicUtils.drawColumnChart(r, component, plotX0, plotY0, plotX1, plotY1, scale);
+            case BAR -> graphicUtils.drawBarChart(r, component, plotX0, plotY0, plotX1, plotY1, scale);
+            case PIE -> graphicUtils.drawPieChart(r, component, plotX0, plotY0, plotX1, plotY1);
+            case SPIDER_WEB -> graphicUtils.drawRadarChart(r, component, plotX0, plotY0, plotX1, plotY1);
+            case CLOUD -> graphicUtils.drawCloudChart(r, component, plotX0, plotY0, plotX1, plotY1, scale);
+            default -> {
+                String msg = "GraphicType not implemented: " + component.getType();
+                r.drawText(msg, plotX0, r.baselineForBox(plotY0, plotY1 - plotY0), textMuted);
+            }
+        }
+
+        // Draw axis labels
+        graphicUtils.drawAxisLabels(r, component, x0, y0, x1, y1, plotX0, plotY0, plotX1, plotY1);
+
+        // Draw legend
+        if (wantLegend && seriesCount > 0 && (legendW > 0 && legendH > 0)) {
+            if (legendRight) {
+                graphicUtils.drawLegendRight(r, component, points, x1 + legendGap, y0, legendW, legendH);
+            } else {
+                graphicUtils.drawLegendBottom(r, component, points, x0, y1 + legendGap, legendW, legendH);
+            }
+        }
+
+        r.popClip();
+    }
+
     public void spacer(int pixels) {
         cursorY += Math.max(0, pixels);
+    }
+
+    public void spacer(SpacerComponent component){
+        spacer(component.getSpacer());
     }
 
     public void separator(UiRenderer r) {
@@ -821,6 +1082,10 @@ public final class Ui {
 
     public void seperator(UiRenderer r, Color color) {
         separator(r, color, 1);
+    }
+
+    public void separator(UiRenderer r, SeparatorComponent component){
+        separator(r, component.getColor(this), component.getThickness());
     }
 
     public void separator(UiRenderer r, Color color, int thickness) {
@@ -930,4 +1195,6 @@ public final class Ui {
     public record ScrollArea(UiRenderer renderer, int id, int x, int y, int width, int height, int maxScroll,
                              float scrollY) {
     }
+
+
 }

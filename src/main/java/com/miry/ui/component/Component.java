@@ -33,6 +33,10 @@ public class Component {
                 ui.sliderFloat(renderer, (SliderComponent) child);
             } else if (child instanceof GridComponent) {
                 ui.grid(renderer, (GridComponent) child);
+            } else if (child instanceof SpacerComponent) {
+                ui.spacer((SpacerComponent) child);
+            } else if (child instanceof  SeparatorComponent) {
+                ui.separator(renderer, (SeparatorComponent) child);
             } else {
                 child.render(ui, renderer);
             }

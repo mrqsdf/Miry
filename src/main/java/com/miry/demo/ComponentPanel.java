@@ -3,6 +3,9 @@ package com.miry.demo;
 import com.miry.ui.PanelContext;
 import com.miry.ui.Ui;
 import com.miry.ui.component.*;
+import com.miry.ui.component.graphic.GraphicComponent;
+import com.miry.ui.component.graphic.GraphicDataSeries;
+import com.miry.ui.component.graphic.GraphicType;
 import com.miry.ui.panels.Panel;
 import com.miry.ui.render.UiRenderer;
 
@@ -12,6 +15,8 @@ public final class ComponentPanel extends Panel {
     private float sliderValue1 = 0.5f;
     private float sliderValue2 = 0.5f;
     private float sliderValue3 = 0.5f;
+
+    GraphicComponent graphic = new GraphicComponent("graphic", GraphicType.CLOUD, 400, 300);
 
     public ComponentPanel() {
         super("Component Panel");
@@ -130,7 +135,43 @@ public final class ComponentPanel extends Panel {
                 .setCell(0, 4, grid5)
                 .setCell(1, 4, grid5);
 
-        ui.grid(r, grid);
+        //ui.grid(r, grid);
+
+
+        GroupedComponent groupedComponent = new GroupedComponent("groupedComponent");
+        groupedComponent.addChild(new TextComponent("This is a grouped component!").setColor(new Color(java.awt.Color.CYAN)));
+        groupedComponent.addChild(new ButtonComponent(new TextComponent("Click me in grouped component!").setColor(new Color(java.awt.Color.WHITE)))
+                .setBgColor(new Color(java.awt.Color.BLUE))
+                .setHoverColor(new Color(java.awt.Color.CYAN))
+                .setActiveColor(new Color(java.awt.Color.LIGHT_GRAY))
+                .setOnClick(() -> System.out.println("Button in grouped component clicked!")));
+        groupedComponent.addChild(new ToggleComponent(new TextComponent("Toggle me in grouped component!").setColor(new Color(java.awt.Color.WHITE)), toggle)
+                .setToggleColor(toggle ? new Color(java.awt.Color.GREEN) : new Color(java.awt.Color.GRAY))
+                .setOnChange(value -> {
+                    toggle = value;
+                    System.out.println("Toggle in grouped component toggled: " + value);
+                }));
+
+        //ui.group(r, groupedComponent);
+
+        ButtonComponent buttonGraph= new ButtonComponent(new TextComponent("Add Data Point").setColor(new Color(java.awt.Color.WHITE)))
+                .setBgColor(new Color(java.awt.Color.DARK_GRAY))
+                .setHoverColor(new Color(java.awt.Color.GRAY))
+                .setActiveColor(new Color(java.awt.Color.LIGHT_GRAY))
+                .setOnClick(() -> {
+                    GraphicDataSeries dataPoint = new GraphicDataSeries(
+                            (float) (Math.random() * 10),
+                            (float) (Math.random() * 10),
+                            "Point " + (graphic.getDataSeries().size() + 1),
+                            new Color(new java.awt.Color((int)(Math.random() * 0x1000000)))
+                    );
+                    graphic.addDataSeries(dataPoint);
+                });
+
+        ui.button(r, buttonGraph);
+        ui.graphic(r, graphic);
+
+
 
         ui.endPanel();
     }
