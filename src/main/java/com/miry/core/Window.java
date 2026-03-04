@@ -58,9 +58,6 @@ public final class Window implements AutoCloseable {
         errorCallback = GLFWErrorCallback.createPrint(System.err);
         errorCallback.set();
 
-        // Force X11 platform on Linux to avoid Wayland issues with LWJGL 3.4+
-        glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
-
         if (!glfwInit()) {
             throw new IllegalStateException("GLFW init failed.");
         }
