@@ -14,6 +14,8 @@ public class Component {
     protected String id;
     protected List<Component> children;
 
+    protected String themeId;
+
     public Component(String id) {
         this.id = id;
         this.children = new ArrayList<>();
@@ -77,5 +79,14 @@ public class Component {
     public void handleScroll(UiContext uiContext, ScrollEvent scrollEvent){
         children.forEach(child -> child.handleScroll(uiContext, scrollEvent));
     }
+    public String getThemeId() {
+        return themeId;
+    }
+
+    public Component setThemeId(String themeId) {
+        this.themeId = themeId;
+        return this;
+    }
+
 
 }

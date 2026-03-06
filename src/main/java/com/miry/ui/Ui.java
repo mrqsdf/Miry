@@ -44,6 +44,7 @@ public final class Ui {
     private int contentX;
     private int contentY;
     private int contentW;
+    private int contentH;
     private UiContext uiContext;
 
     private final Map<Integer, Anim> anims = new HashMap<>();
@@ -113,8 +114,10 @@ public final class Ui {
         contentX = x + theme.tokens.padding;
         contentY = y + theme.tokens.padding;
         contentW = Math.max(1, width - theme.tokens.padding * 2);
+        contentH = Math.max(1, height - theme.tokens.padding * 2);
         cursorX = contentX;
         cursorY = contentY;
+
     }
 
     /**
@@ -378,8 +381,8 @@ public final class Ui {
         int x = rect.x + 6 + box + 10;
         drawTextComponents(r, components, x, baselineY);
 
-        if (changed && component.getOnChange() != null) {
-            component.getOnChange().accept(value);
+        if (changed) {
+            component.toggle();
         }
 
         return value;
@@ -550,8 +553,8 @@ public final class Ui {
         int x = rect.x + 10;
         drawTextComponents(r, components, x, baselineY);
 
-        if (changed && component.getOnChange() != null) {
-            component.getOnChange().accept(value);
+        if (changed) {
+            component.slider(value);
         }
 
         return value;
@@ -646,8 +649,13 @@ public final class Ui {
      * </ul>
      */
     public void scrollArea(UiRenderer r, ScrollAreaComponent sc) {
-        int h = Math.max(1, sc.getHeight());
-        Rect rect = nextRect(h); // allocates space in the current flow layout
+        int h = sc.getHeight();
+
+        if (h <= 0) {
+            h = Math.max(1, contentH - cursorY);
+        }
+
+        Rect rect = nextRect(h);
         scrollArea(r, sc, rect);
     }
 
@@ -675,6 +683,10 @@ public final class Ui {
         } else if (c instanceof GraphicComponent graph) {
             Rect rr = nextRect(graph.getHeight());
             graphic(r, graph, rr);
+        } else if (c instanceof TextFieldComponent tf) {
+            textField(r, tf);
+        } else if (c instanceof ComboBoxComponent<?> cb) {
+            comboBox(r, cb);
         } else {
             Rect rr = nextRect(theme.tokens.itemHeight);
             drawPlaceHolder(rr, c, r);
