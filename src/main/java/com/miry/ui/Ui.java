@@ -8,6 +8,8 @@ import com.miry.ui.component.graphic.GraphicUtils;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
+import com.miry.ui.widgets.ComboBox;
+import com.miry.ui.widgets.TextField;
 import org.joml.Vector2f;
 
 import java.util.*;
@@ -42,6 +44,7 @@ public final class Ui {
     private int contentX;
     private int contentY;
     private int contentW;
+    private UiContext uiContext;
 
     private final Map<Integer, Anim> anims = new HashMap<>();
     private final Map<Integer, ScrollState> scrollStates = new HashMap<>();
@@ -575,6 +578,109 @@ public final class Ui {
         image(r, component, rect);
     }
 
+    /**
+     * Renders a {@link ScrollAreaComponent} in "flow layout" (vertical stacking) and updates its content height.
+     *
+     * <p>Features added:</p>
+     * <ul>
+     *   <li><b>Y offset support</b>: you can shift the scroll area down inside its allocated region
+     *       (useful if you rendered non-component elements before it).</li>
+     *   <li><b>Rect-less usage</b>: you can call {@link #scrollArea(UiRenderer, ScrollAreaComponent)} and the UI
+     *       will allocate the region automatically using {@code nextRect(height)}.</li>
+     * </ul>
+     *
+     * <p><b>How content height is handled</b>:</p>
+     * <ul>
+     *   <li>The component stores a cached {@code contentHeight}.</li>
+     *   <li>Each frame, we render children inside the scroll area (flow).</li>
+     *   <li>After rendering, we compute the actually used content height and store it back into the component.
+     *       This makes scrolling correct starting from the next frame (which is perfectly fine in IMUI).</li>
+     * </ul>
+     */
+    public void scrollArea(UiRenderer r, ScrollAreaComponent sc, Rect rect) {
+        pushId(sc.getId() == null ? "scroll" : sc.getId());
+
+        // Optional vertical offset inside the provided rect
+        final int yOffset = Math.max(0, sc.getYOffset());
+        final int viewX = rect.x;
+        final int viewY = rect.y + yOffset;
+        final int viewW = rect.w;
+        final int viewH = Math.max(1, rect.h - yOffset);
+
+        final String key = (sc.getKey() != null ? sc.getKey() : sc.getId());
+        final int cachedContentH = Math.max(viewH, sc.getContentHeight());
+
+        Ui.ScrollArea area = beginScrollArea(r, key, viewX, viewY, viewW, viewH, cachedContentH);
+        UiRenderer sr = area.renderer();
+
+        // Render children in flow layout inside the scroll area
+        for (Component child : sc.getChildren()) {
+            renderComponentFlow(sr, child);
+        }
+
+        // Update contentHeight based on what was actually consumed this frame
+        int usedContentH = Math.max(viewH, (cursorY - contentY));
+        sc.setContentHeight(usedContentH);
+
+        endScrollArea(area);
+
+        popId();
+    }
+
+    /**
+     * Renders a {@link ScrollAreaComponent} without providing a {@link Rect}.
+     *
+     * <p>This is the "immediate-mode" style call: the scroll area takes a vertical slot from the current cursor
+     * position using {@code nextRect(sc.getHeight())}.</p>
+     *
+     * <p>Useful when you just want:</p>
+     * <pre>
+     *   ui.scrollArea(r, myScroll);
+     * </pre>
+     *
+     * <p>Requirements:</p>
+     * <ul>
+     *   <li>{@link ScrollAreaComponent#getHeight()} must be &gt; 0</li>
+     *   <li>If you want it to occupy remaining panel space, you can compute that height externally
+     *       and set it on the component.</li>
+     * </ul>
+     */
+    public void scrollArea(UiRenderer r, ScrollAreaComponent sc) {
+        int h = Math.max(1, sc.getHeight());
+        Rect rect = nextRect(h); // allocates space in the current flow layout
+        scrollArea(r, sc, rect);
+    }
+
+    private void renderComponentFlow(UiRenderer r, Component c) {
+        if (c == null) return;
+
+        if (c instanceof ButtonComponent bc) {
+            button(r, bc); // version flow (nextRect)
+        } else if (c instanceof TextComponent tc) {
+            label(r, tc);  // version flow (nextRect)
+        } else if (c instanceof TextureComponent tex) {
+            // à toi d'adapter selon ton TextureComponent (width/height)
+            image(r, tex.getTexture(), tex.getWidth(), tex.getHeight(), tex.getTintArgb()); // version flow (nextRect)
+        } else if (c instanceof SliderComponent sc) {
+            sliderFloat(r, sc); // version flow (nextRect)
+        } else if (c instanceof ToggleComponent tc) {
+            toggle(r, tc); // version flow (nextRect)
+        } else if (c instanceof GridComponent gc) {
+            grid(r, gc);   // grid gère cursorY elle-même
+        } else if (c instanceof GroupedComponent gc) {
+            group(r, gc);  // group gère cursorY elle-même
+        } else if (c instanceof ScrollAreaComponent sac) {
+            Rect rr = nextRect(theme.tokens.itemHeight * 6);
+            scrollArea(r, sac, rr);
+        } else if (c instanceof GraphicComponent graph) {
+            Rect rr = nextRect(graph.getHeight());
+            graphic(r, graph, rr);
+        } else {
+            Rect rr = nextRect(theme.tokens.itemHeight);
+            drawPlaceHolder(rr, c, r);
+        }
+    }
+
     private void image(UiRenderer r, TextureComponent component, Rect rect) {
         int iw = Math.min(component.getWidth(), rect.w);
         int ih = Math.min(component.getHeight(), rect.h);
@@ -799,6 +905,12 @@ public final class Ui {
             sliderFloat(r, sc, rect);
         } else if (c instanceof ToggleComponent tc) {
             toggle(r, tc, rect);
+        } else if (c instanceof TextFieldComponent tfc) {
+            textField(r, tfc, rect);
+        }else if (c instanceof ComboBoxComponent<?> cbc) {
+            comboBox(r, (ComboBoxComponent<Object>) cbc, rect);
+        } else if (c instanceof ScrollAreaComponent sc) {
+            scrollArea(r, sc, rect);
         } else if (c instanceof GraphicComponent gc) {
             // Render the graphic inside the given rect without breaking external layout.
             layoutStack.push(new LayoutState(contentX, contentY, contentW, cursorX, cursorY));
@@ -1094,6 +1206,191 @@ public final class Ui {
         spacer(thickness / 2);
     }
 
+    public void textField(UiRenderer r, TextFieldComponent component) {
+        // Default layout: use one row height (like other widgets)
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        textField(r, component, rect);
+    }
+
+    private void textField(UiRenderer r, TextFieldComponent component, Rect rect) {
+        if (r == null || component == null) return;
+
+        TextField tf = component.textField();
+
+        // Compute hover/press state for visuals (TextField will also do it, but it needs input+ctx anyway)
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+
+        // Use full widget render to restore focus on click
+        UiContext ctx = this.uiContext;
+
+        // If ctx is missing, we fall back to raw rendering (no focus possible)
+        if (ctx == null) {
+            int id = id(component.getId());
+            float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+
+            Color bg = component.getBgColor(this);
+            Color hoverBg = component.getHoverColor(this);
+            int fg = component.getTextColor(this).getArgb();
+            int caret = theme.widgetActive.getArgb();
+
+            int bgFinal = Theme.lerpArgb(bg, hoverBg, hoverT);
+            tf.render(r, rect.x, rect.y, rect.w, rect.h, bgFinal, fg, caret);
+            r.drawRectOutline(rect.x, rect.y, rect.w, rect.h, Math.max(1, theme.design.border_thin), theme.widgetOutline.getArgb());
+            return;
+        }
+
+        // Temporarily patch theme colors so TextField uses your component colors.
+        // This keeps the original TextField behavior (focus, selection, caret blinking, etc.)
+        // while letting your component control colors.
+        Color prevWidgetBg = new Color(theme.widgetBg.getArgb());
+        Color prevWidgetHover = new Color(theme.widgetHover.getArgb());
+        Color prevText = new Color(theme.text.getArgb());
+
+
+        try {
+            // Theme expects colors; your component returns Color with ARGB.
+            // If theme.widgetBg is your own Color class, adapt accordingly.
+            theme.widgetBg.set(component.getBgColor(this));
+            theme.widgetHover.set(component.getHoverColor(this));
+            theme.text.set(component.getTextColor(this));
+
+            // Render with full interaction (focus + pressed + hover)
+            tf.render(
+                    r,
+                    ctx,
+                    input(),
+                    theme,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    true
+            );
+        } finally {
+            // Restore theme state to avoid affecting other widgets
+            theme.widgetBg.set(prevWidgetBg);
+            theme.widgetHover.set(prevWidgetHover);
+            theme.text.set(prevText);
+        }
+    }
+
+    public <T> boolean comboBox(UiRenderer r, ComboBoxComponent<T> component) {
+        // Default layout: use one row height (like other widgets)
+        Rect rect = nextRect(theme.tokens.itemHeight);
+        return comboBox(r, component, rect);
+    }
+
+    private <T> boolean comboBox(UiRenderer r, ComboBoxComponent<T> component, Rect rect) {
+        if (r == null || component == null) return false;
+
+        ComboBox<T> cb = component.comboBox();
+        UiContext ctx = this.uiContext;
+
+        // Resolve component colors once (component already handles theme fallback)
+        Color bgColor = component.getBgColor(this);
+        Color hoverColor = component.getHoverColor(this);
+        Color textColor = component.getTextColor(this);
+
+        // If no context, we can still render a basic button and popup, but focus/overlay is limited.
+        // We prefer not to break: render button + immediate popup (no overlay queue).
+        if (ctx == null) {
+            int id = id(component.getId());
+            boolean hovered = rect.contains(mouse.x, mouse.y);
+
+            // IMUI press/active handling for the button
+            boolean clicked = false;
+            if (hovered) hotId = id;
+            if (hovered && input.mousePressed()) activeId = id;
+            if (activeId == id && hovered && input.mouseReleased()) {
+                clicked = true;
+                activeId = 0;
+            }
+            if (activeId == id && input.mouseReleased() && !hovered) activeId = 0;
+
+            float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
+            int bgFinal = Theme.lerpArgb(bgColor, hoverColor, hoverT);
+
+            // Toggle popup on click
+            if (clicked) cb.setOpen(!cb.isOpen());
+
+            // Render button
+            cb.renderButton(r, rect.x, rect.y, rect.w, rect.h, bgFinal, textColor.getArgb());
+            r.drawRectOutline(rect.x, rect.y, rect.w, rect.h, Math.max(1, theme.design.border_thin), theme.widgetOutline.getArgb());
+
+            // Render popup directly (no overlay pass)
+            boolean changed = false;
+            if (cb.isOpen()) {
+                int popupX = rect.x;
+                int popupY = rect.y + rect.h;
+
+                int popupMaxH = Math.max(theme.tokens.itemHeight * 6, rect.h * 6);
+                int itemH = theme.tokens.itemHeight;
+
+                int hoverIndex = cb.hoverIndex((int) mouse.x, (int) mouse.y, popupX, popupY, rect.w, popupMaxH, itemH);
+
+                if (input.mousePressed()) {
+                    int before = cb.selectedIndex();
+                    boolean consumed = cb.handlePopupClick((int) mouse.x, (int) mouse.y, popupX, popupY, rect.w, popupMaxH, itemH);
+                    changed = before != cb.selectedIndex();
+                    if (!consumed && !hovered) cb.setOpen(false);
+                }
+
+                int popupBg = theme.panelBg.getArgb();
+                int popupHover = hoverColor.getArgb();
+                cb.renderPopup(r, popupX, popupY, rect.w, popupMaxH, itemH, popupBg, popupHover, textColor.getArgb(), hoverIndex);
+            }
+
+            return changed;
+        }
+
+        // Context available: use the full ComboBox.render(...) so focus + overlay works properly.
+        // We temporarily patch theme colors so the widget uses component colors.
+        // This matches the TextField approach (save -> set -> render -> restore).
+
+        Color prevWidgetBg = new Color(theme.widgetBg.getArgb());
+        Color prevWidgetHover = new Color(theme.widgetHover.getArgb());
+        Color prevText = new Color(theme.text.getArgb());
+        Color prevPanelBg = new Color(theme.panelBg.getArgb());
+
+        try {
+            // Apply component colors
+            theme.widgetBg.set(bgColor);
+            theme.widgetHover.set(hoverColor);
+            theme.text.set(textColor);
+
+            // Popup background usually uses panelBg; keep theme panel bg, or you can override if desired.
+            // Here we keep it stable (but we still restore because we captured it).
+            // theme.panelBg.set(...);
+
+            int popupMaxH = Math.max(theme.tokens.itemHeight * 8, rect.h * 8);
+            int itemH = theme.tokens.itemHeight;
+
+            // Defer popup so it renders above other UI automatically via ctx.overlay()
+            boolean deferPopup = true;
+
+            return cb.render(
+                    r,
+                    ctx,
+                    input(),
+                    theme,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    popupMaxH,
+                    itemH,
+                    true,
+                    deferPopup
+            );
+        } finally {
+            // Restore theme colors to avoid affecting other widgets
+            theme.widgetBg.set(prevWidgetBg);
+            theme.widgetHover.set(prevWidgetHover);
+            theme.text.set(prevText);
+            theme.panelBg.set(prevPanelBg);
+        }
+    }
+
     private static void drawBevelButton(UiRenderer r,
                                         float x,
                                         float y,
@@ -1167,6 +1464,10 @@ public final class Ui {
 
     private static boolean pxInside(float px, float py, int x, int y, int w, int h) {
         return px >= x && py >= y && px < (x + w) && py < (y + h);
+    }
+
+    public void setContext(UiContext uiContext) {
+        this.uiContext = uiContext;
     }
 
     private static final class Anim {
