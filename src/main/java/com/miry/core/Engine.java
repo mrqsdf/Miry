@@ -50,7 +50,7 @@ public final class Engine {
         if (watchdog != null) watchdog.stage("engine.time.init");
         time.init();
         if (watchdog != null) watchdog.stage("app.onInit");
-        application.onInit();
+        application.init();
 
         while (!window.shouldClose()) {
             boolean continuous = application.isContinuous();
@@ -67,7 +67,8 @@ public final class Engine {
             if (watchdog != null) watchdog.stage("engine.time.tick");
             time.tick();
             if (watchdog != null) watchdog.stage("app.onUpdate");
-            application.onUpdate(time.deltaTime());
+            MiryHost host = MiryContext.host();
+            application.update(time.deltaTime(), host);
 
             if (watchdog != null) watchdog.stage("gl.clear");
             GL11.glViewport(0, 0, window.getFramebufferWidth(), window.getFramebufferHeight());
@@ -75,7 +76,7 @@ public final class Engine {
             GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
 
             if (watchdog != null) watchdog.stage("app.onRender");
-            application.onRender();
+            application.render(host);
             if (watchdog != null) watchdog.stage("window.swapBuffers");
             window.swapBuffers();
         }

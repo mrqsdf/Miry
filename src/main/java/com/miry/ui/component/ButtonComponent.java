@@ -11,7 +11,7 @@ public class ButtonComponent extends Component {
     private Color bgColor;
     private Color hoverColor;
     private Color activeColor;
-    private String themeId;
+
     private Runnable onClick;
 
     public ButtonComponent(String id, TextComponent label) {
@@ -35,11 +35,6 @@ public class ButtonComponent extends Component {
 
     public ButtonComponent setActiveColor(Color activeColor) {
         this.activeColor = activeColor;
-        return this;
-    }
-
-    public ButtonComponent setThemeId(String themeId) {
-        this.themeId = themeId;
         return this;
     }
 
@@ -76,9 +71,7 @@ public class ButtonComponent extends Component {
             return themeId != null ? ui.theme().getColor(themeId + ".buttonActive") != null ? ui.theme().getColor(themeId + ".buttonActive") : new Color(Theme.toArgb(ui.theme().widgetActive)) : new Color(Theme.toArgb(ui.theme().widgetActive));
     }
 
-    public String getThemeId() {
-        return themeId;
-    }
+
 
     public Runnable getOnClick() {
         return onClick;

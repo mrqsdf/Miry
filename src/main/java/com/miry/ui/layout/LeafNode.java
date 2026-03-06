@@ -3,6 +3,7 @@ package com.miry.ui.layout;
 import com.miry.ui.PanelContext;
 import com.miry.ui.Ui;
 import com.miry.ui.UiContext;
+import com.miry.ui.event.*;
 import com.miry.ui.panels.Panel;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
@@ -18,13 +19,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class LeafNode extends DockNode {
     private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
 
+
     public enum HeaderButtons {
         NONE,
         CLOSE_ONLY,
-        SPLIT_AND_CLOSE
+        SPLIT_AND_CLOSE;
     }
-
     private final int instanceId = NEXT_ID.getAndIncrement();
+
     private int backgroundArgb = 0xFF1C1C1E;
     private final ArrayList<Panel> tabs = new ArrayList<>();
     private int activeTabIndex;
@@ -34,12 +36,13 @@ public final class LeafNode extends DockNode {
     private HeaderButtons headerButtons = HeaderButtons.SPLIT_AND_CLOSE;
     private boolean headerButtonsOnlyOnHover;
     private final PanelContext panelContext = new PanelContext();
-
     public LeafNode(Panel panel) {
         if (panel != null) {
             tabs.add(panel);
         }
     }
+
+
 
     public void setBackgroundArgb(int argb) {
         this.backgroundArgb = argb;
@@ -368,6 +371,25 @@ public final class LeafNode extends DockNode {
             int a = Math.round(a0 * (1.0f - t) * 0.65f);
             int c = (a << 24) | rgb;
             r.drawRoundedRect(x + dx - spread, y + dy - spread, w + spread * 2.0f, h + spread * 2.0f, radiusPx + spread, c);
+        }
+    }
+
+    public void processEvents(boolean block, UiEvent event) {
+        Panel panel = panel();
+        if (panel != null && !block) {
+            if (event instanceof KeyEvent keyEvent){
+                panel.handleKey(panelContext.uiContext(), keyEvent);
+            } else if (event instanceof FocusEvent focusEvent) {
+                panel.handleFocus(panelContext.uiContext(), focusEvent);
+            } else if (event instanceof MouseButtonEvent mouseButtonEvent){
+                panel.handleMouseButton(panelContext.uiContext(), mouseButtonEvent);
+            } else if (event instanceof MouseMoveEvent mouseMoveEvent){
+                panel.handleMouseMove(panelContext.uiContext(), mouseMoveEvent);
+            } else if (event instanceof ScrollEvent scrollEvent){
+                panel.handleScroll(panelContext.uiContext(), scrollEvent);
+            } else if (event instanceof TextInputEvent textInputEvent){
+                panel.handleTextInput(panelContext.uiContext(), textInputEvent);
+            }
         }
     }
 

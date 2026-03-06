@@ -2,6 +2,7 @@ package com.miry.ui.layout;
 
 import com.miry.ui.Ui;
 import com.miry.ui.UiContext;
+import com.miry.ui.event.UiEvent;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 
@@ -29,8 +30,20 @@ public final class DockSpace {
         this.root = Objects.requireNonNull(root, "root");
     }
 
+    public DockSpace() {
+        this.root = new LeafNode(new com.miry.ui.panels.PlaceholderPanel(
+                "Root Panel",
+                "This is the initial root panel. It is recommended to set a custom root layout before using the DockSpace.\r\n" +
+                        "dockerSpace.setRoot([DockerNode]) in Application.onInit()"
+        ));
+    }
+
     public DockNode root() {
         return root;
+    }
+
+    public void setRoot(DockNode root) {
+        this.root = Objects.requireNonNull(root, "root");
     }
 
     public void setUi(Ui ui) {
@@ -107,6 +120,22 @@ public final class DockSpace {
         node.render(r);
     }
 
+    public void processEvents(boolean block, UiEvent event) {
+        processEventNode(root, block, event);
+    }
+
+    private void processEventNode(DockNode node, boolean block, UiEvent event) {
+        if (node instanceof SplitNode split) {
+            processEventNode(split.childA, block, event);
+            processEventNode(split.childB, block, event);
+            return;
+        }
+        if (node instanceof LeafNode leaf) {
+            leaf.processEvents(block, event);
+            return;
+        }
+    }
+
     private enum HeaderAction {
         NONE,
         SPLIT_H,
@@ -145,8 +174,8 @@ public final class DockSpace {
     private void splitLeaf(LeafNode leaf, boolean vertical) {
         if (leaf == null) return;
         var panel = new com.miry.ui.panels.PlaceholderPanel(
-            "Panel " + nextPlaceholder,
-            "Placeholder panel (created by split)."
+                "Panel " + nextPlaceholder,
+                "Placeholder panel (created by split)."
         );
         nextPlaceholder++;
         LeafNode other = new LeafNode(panel);

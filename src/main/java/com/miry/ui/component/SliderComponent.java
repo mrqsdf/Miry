@@ -104,4 +104,13 @@ public class SliderComponent extends Component {
         return onChange;
     }
 
+    public void setValue(float value) {
+        this.value = Math.max(min, Math.min(max, value));
+    }
+
+    public void slider(float value){
+        if (onChange != null) onChange.accept(value);
+        this.value = Math.max(min, Math.min(max, value));
+    }
+
 }

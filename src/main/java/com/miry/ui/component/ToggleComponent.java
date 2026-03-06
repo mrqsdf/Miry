@@ -11,7 +11,7 @@ public class ToggleComponent extends Component {
     private final TextComponent label;
     private Color toggleColor;
     private String themeId;
-    private final boolean toggled;
+    private boolean toggled;
     private Consumer<Boolean> onChange;
 
     public ToggleComponent(String id, TextComponent label, boolean toggled) {
@@ -72,6 +72,11 @@ public class ToggleComponent extends Component {
     public ToggleComponent setOnChange(Consumer<Boolean> onChange) {
         this.onChange = onChange;
         return this;
+    }
+
+    public void toggle() {
+        if (onChange != null) onChange.accept(!toggled);
+        this.toggled = !toggled;
     }
 
 

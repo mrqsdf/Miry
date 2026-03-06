@@ -9,6 +9,7 @@ import com.miry.graphics.batch.BatchRenderer;
 import com.miry.graphics.post.GaussianBlur;
 import com.miry.platform.InputConstants;
 import com.miry.platform.MiryContext;
+import com.miry.platform.MiryHost;
 import com.miry.ui.Ui;
 import com.miry.ui.UiContext;
 import com.miry.ui.event.KeyEvent;
@@ -47,17 +48,9 @@ import java.nio.ByteBuffer;
  * </ul>
  */
 public final class ShowcaseDemoApplication extends Application {
-    private BatchRenderer batch;
-    private FontAtlas fontAtlas;
-    private TextRenderer textRenderer;
-    private Ui ui;
-    private UiContext uiContext;
-    private final UiInput input = new UiInput();
 
-    private DockSpace dockSpace;
-    private Framebuffer uiFramebuffer;
     private GaussianBlur blur;
-    private WindowManager windowManager;
+
 
     private Viewport3D viewport3d;
     private ViewportPanel viewportPanel;
@@ -65,30 +58,18 @@ public final class ShowcaseDemoApplication extends Application {
     private final NodeGraph nodeGraph = new NodeGraph();
     private NodeGraphPanel nodeGraphPanel;
 
-    private boolean prevLeft;
-    private boolean prevRight;
-    private final ToastManager toasts = new ToastManager();
-    private final EyedropperButton eyedropper = new EyedropperButton();
-    private int pickedColorArgb = 0xFF4772B3;
     private InputPanel inputPanel;
     private WidgetsShowcasePanel widgetsPanel;
     private PrimitivesPanel primitivesPanel;
 
     private ComponentPanel componentPanel;
 
-    private double lastInteractionTime;
-    private float prevScrollY;
-    private float prevMouseX, prevMouseY;
+    public ShowcaseDemoApplication() {
+        super(30_000);
+    }
 
     @Override
     protected void onInit() {
-        lastInteractionTime = System.nanoTime() / 1_000_000_000.0;
-        Theme theme = new Theme();
-        batch = new BatchRenderer(30_000);
-        ui = new Ui(theme);
-
-        long window = MiryContext.host().getNativeWindow();
-        uiContext = new UiContext(window);
 
         installFont();
 
@@ -98,7 +79,7 @@ public final class ShowcaseDemoApplication extends Application {
 
         uiFramebuffer = new Framebuffer();
         blur = new GaussianBlur();
-        windowManager = new WindowManager();
+
 
         var search = windowManager.create("Search", 120, 110, 460, 280);
         search.setBackdropBlur(true);
@@ -148,45 +129,17 @@ public final class ShowcaseDemoApplication extends Application {
 
         SplitNode leftAndCenter = new SplitNode(leftCol, centerCol, false, 0.30f);
         SplitNode root = new SplitNode(leftAndCenter, rightCol, false, 0.78f);
-        dockSpace = new DockSpace(root);
-        dockSpace.setUi(ui);
-        dockSpace.setUiContext(uiContext);
-    }
-
-    private void installFont() {
-        ByteBuffer fontData = FontData.loadDefault();
-        float scale = Math.max(0.1f, MiryContext.host().getFramebufferScale());
-        int atlasSize = Math.min(2048, Math.max(1024, Math.round(768.0f * scale)));
-        fontAtlas = new FontAtlas(fontData, 20.0f, atlasSize, scale, FontAtlas.Mode.COVERAGE);
-        textRenderer = new TextRenderer(fontAtlas);
-        batch.setTextRenderer(textRenderer);
+        dockSpace.setRoot(root);
     }
 
     @Override
-    public boolean isContinuous() {
-        // Smart optimization: Render continuously if user interacted recently (hysteresis).
-        double now = System.nanoTime() / 1_000_000_000.0;
-        return (now - lastInteractionTime) < 2.0;
-    }
-
-    @Override
-    public boolean needsRepaint() {
-        // Wake up for active animations or toasts.
-        if (uiContext.animations().activeCount() > 0) return true;
-        if (toasts.activeCount() > 0) return true;
-        // Keep rendering if a text field is focused (for caret blinking)
-        if (uiContext.focus().hasAnyFocus()) return true;
-        return false;
-    }
-
-    @Override
-    protected void onUpdate(float dt) {
+    protected void onUpdate(float dt, MiryHost host) {
         // Detect input activity for hysteresis
-        var host = MiryContext.host();
+
         float mx = host.getMousePos().x;
         float my = host.getMousePos().y;
         float sy = (float) Input.consumeScrollY(); // Note: consume call moves here to capture value
-        
+
         boolean inputActive = false;
         if (Math.abs(mx - prevMouseX) > 0.1f || Math.abs(my - prevMouseY) > 0.1f) inputActive = true;
         if (Math.abs(sy) > 0.001f) inputActive = true;
@@ -206,7 +159,7 @@ public final class ShowcaseDemoApplication extends Application {
         if (widgetsPanel != null) {
             widgetsPanel.update(dt);
         }
-        
+
         // Input state update
         Vector2f mp = host.getMousePos(); // Re-read or reuse mx/my
         boolean left = host.isMouseDown(InputConstants.MOUSE_BUTTON_LEFT);
@@ -280,33 +233,10 @@ public final class ShowcaseDemoApplication extends Application {
         processEvents(block);
     }
 
-    private void processEvents(boolean blockedByWindow) {
-        UiEvent event;
-        while ((event = uiContext.pollEvent()) != null) {
-            // Any event resets the idle timer
-            lastInteractionTime = System.nanoTime() / 1_000_000_000.0;
 
-            if (event instanceof KeyEvent keyEvent) {
-                if (!blockedByWindow && inputPanel != null) {
-                    inputPanel.handleKey(uiContext, keyEvent);
-                }
-                if (!blockedByWindow && widgetsPanel != null) {
-                    widgetsPanel.handleKey(uiContext, keyEvent);
-                }
-            } else if (event instanceof TextInputEvent textEvent) {
-                if (!blockedByWindow && inputPanel != null) {
-                    inputPanel.handleTextInput(uiContext, textEvent);
-                }
-                if (!blockedByWindow && widgetsPanel != null) {
-                    widgetsPanel.handleTextInput(uiContext, textEvent);
-                }
-            }
-        }
-    }
 
     @Override
-    protected void onRender() {
-        var host = MiryContext.host();
+    protected void onRender(MiryHost host) {
         int w = host.getWindowWidth();
         int h = host.getWindowHeight();
         int fbW = host.getFramebufferWidth();
@@ -358,9 +288,5 @@ public final class ShowcaseDemoApplication extends Application {
     protected void onShutdown() {
         if (viewport3d != null) viewport3d.close();
         if (blur != null) blur.close();
-        if (uiFramebuffer != null) uiFramebuffer.close();
-        if (fontAtlas != null) fontAtlas.close();
-        if (uiContext != null) uiContext.close();
-        if (batch != null) batch.close();
     }
 }
