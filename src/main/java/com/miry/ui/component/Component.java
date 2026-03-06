@@ -2,6 +2,8 @@ package com.miry.ui.component;
 //todo add doc
 
 import com.miry.ui.Ui;
+import com.miry.ui.UiContext;
+import com.miry.ui.event.*;
 import com.miry.ui.render.UiRenderer;
 
 import java.util.ArrayList;
@@ -9,8 +11,8 @@ import java.util.List;
 
 public class Component {
 
-    private String id;
-    private List<Component> children;
+    protected String id;
+    protected List<Component> children;
 
     public Component(String id) {
         this.id = id;
@@ -50,6 +52,30 @@ public class Component {
 
     public List<Component> getChildren() {
         return children;
+    }
+
+    public void handleKey(UiContext uiContext, KeyEvent keyEvent){
+        children.forEach(child -> child.handleKey(uiContext, keyEvent));
+    }
+
+    public void handleTextInput(UiContext uiContext, TextInputEvent textInputEvent){
+        children.forEach(child -> child.handleTextInput(uiContext, textInputEvent));
+    }
+
+    public void handleFocus(UiContext uiContext, FocusEvent focusEvent){
+        children.forEach(child -> child.handleFocus(uiContext, focusEvent));
+    }
+
+    public void handleMouseButton(UiContext uiContext, MouseButtonEvent mouseButtonEvent){
+        children.forEach(child -> child.handleMouseButton(uiContext, mouseButtonEvent));
+    }
+
+    public void handleMouseMove(UiContext uiContext, MouseMoveEvent mouseMoveEvent){
+        children.forEach(child -> child.handleMouseMove(uiContext, mouseMoveEvent));
+    }
+
+    public void handleScroll(UiContext uiContext, ScrollEvent scrollEvent){
+        children.forEach(child -> child.handleScroll(uiContext, scrollEvent));
     }
 
 }
