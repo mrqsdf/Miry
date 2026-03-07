@@ -145,6 +145,7 @@ public final class WidgetsShowcasePanel extends Panel {
             || searchable.isOpen();
     }
 
+    @Override
     public void handleKey(UiContext ctx, KeyEvent e) {
         if (e == null) return;
         if (modal.isOpen()) {
@@ -166,6 +167,7 @@ public final class WidgetsShowcasePanel extends Panel {
         }
     }
 
+    @Override
     public void handleTextInput(UiContext ctx, TextInputEvent e) {
         if (e == null) return;
         if (modal.isOpen()) return;

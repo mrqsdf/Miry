@@ -8,7 +8,7 @@ package com.miry.ui.component;
  *
  * <p>This component is meant to be rendered by {@code Ui.scrollArea(...)}.</p>
  *
- * <h3>Key concepts</h3>
+ * Key concepts
  * <ul>
  *   <li><b>height</b>: visible viewport height used by the rect-less overload {@code scrollArea(r, sc)}.</li>
  *   <li><b>yOffset</b>: shifts the scroll area viewport down inside its allocated region.

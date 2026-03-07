@@ -1,14 +1,16 @@
-package com.miry.ui.component;
+package com.miry.ui.component.widget;
 
 import com.miry.ui.Ui;
 import com.miry.ui.UiContext;
+import com.miry.ui.component.Color;
+import com.miry.ui.component.Component;
 import com.miry.ui.event.KeyEvent;
 import com.miry.ui.event.TextInputEvent;
 import com.miry.ui.theme.Theme;
 import com.miry.ui.util.NumericExpression;
 import com.miry.ui.widgets.TextField;
 
-public class TextFieldComponent extends Component{
+public class TextFieldComponent extends Component {
 
     private final TextField textField;
     private boolean isNumberOnly = false;
@@ -20,6 +22,11 @@ public class TextFieldComponent extends Component{
     public TextFieldComponent(String id, String defaultText) {
         super(id);
         this.textField = new TextField(defaultText);
+    }
+
+    public TextFieldComponent(String id, TextField textField) {
+        super(id);
+        this.textField = textField;
     }
 
     public String text() {
@@ -86,5 +93,20 @@ public class TextFieldComponent extends Component{
         if (textColor != null) return textColor;
         else
             return themeId != null ? ui.theme().getColor(themeId + ".text") != null ? ui.theme().getColor(themeId + ".text") : new Color(Theme.toArgb(ui.theme().text)) : new Color(Theme.toArgb(ui.theme().text));
+    }
+
+    public TextFieldComponent setBgColor(Color bgColor) {
+        this.bgColor = bgColor;
+        return this;
+    }
+
+    public TextFieldComponent setHoverColor(Color hoverColor) {
+        this.hoverColor = hoverColor;
+        return this;
+    }
+
+    public TextFieldComponent setTextColor(Color textColor) {
+        this.textColor = textColor;
+        return this;
     }
 }

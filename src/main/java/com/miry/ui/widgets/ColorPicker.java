@@ -1,6 +1,7 @@
 package com.miry.ui.widgets;
 
 import com.miry.graphics.Texture;
+import com.miry.ui.component.Color;
 import com.miry.ui.core.BaseWidget;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
@@ -420,4 +421,8 @@ public final class ColorPicker extends BaseWidget {
     public float saturation() { return saturation; }
     public float value() { return value; }
     public float alpha() { return alpha; }
+
+    public Color color() {
+        return new Color(toArgb());
+    }
 }

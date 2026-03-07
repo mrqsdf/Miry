@@ -1,7 +1,9 @@
-package com.miry.ui.component;
+package com.miry.ui.component.widget;
 
 import com.miry.ui.Ui;
 import com.miry.ui.UiContext;
+import com.miry.ui.component.Color;
+import com.miry.ui.component.Component;
 import com.miry.ui.event.KeyEvent;
 import com.miry.ui.event.TextInputEvent;
 import com.miry.ui.theme.Theme;

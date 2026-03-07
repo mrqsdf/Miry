@@ -7,11 +7,17 @@ import com.miry.ui.component.*;
 import com.miry.ui.component.graphic.GraphicComponent;
 import com.miry.ui.component.graphic.GraphicDataSeries;
 import com.miry.ui.component.graphic.GraphicType;
+import com.miry.ui.component.widget.ColorPickerComponent;
+import com.miry.ui.component.widget.ComboBoxComponent;
+import com.miry.ui.component.widget.FileBrowerComponent;
+import com.miry.ui.component.widget.TextFieldComponent;
 import com.miry.ui.event.KeyEvent;
 import com.miry.ui.event.TextInputEvent;
 import com.miry.ui.panels.Panel;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.widgets.ComboBox;
+
+import java.nio.file.Path;
 
 public final class ComponentPanel extends Panel {
 
@@ -27,32 +33,34 @@ public final class ComponentPanel extends Panel {
     private ComboBoxComponent comboComponent;
     private ScrollAreaComponent scrollArea;
 
-    ToggleComponent scrollAreaToggleComp;
-
-    TextComponent text;
-    TextComponent textRed;
-    TextComponent toggleText;
-    ToggleComponent toggleComp;
-    TextComponent buttonText1;
-    ButtonComponent button1;
-    TextComponent buttonText2;
-    ButtonComponent button2;
-    TextComponent sliderText1;
-    SliderComponent slider1;
-    TextComponent sliderText2;
-    SliderComponent slider2;
-
-    Component component;
-    TextComponent grid1;
-    ButtonComponent grid2;
-    ButtonComponent grid3;
-    TextComponent grid4;
-    ToggleComponent grid5;
-    GridComponent grid;
-    GroupedComponent groupedComponent;
-    ButtonComponent buttonGraph;
-    GraphicComponent graphic;
-    ToggleComponent groupedToggle;
+    private ToggleComponent scrollAreaToggleComp;
+    private TextComponent text;
+    private TextComponent textRed;
+    private TextComponent toggleText;
+    private ToggleComponent toggleComp;
+    private TextComponent buttonText1;
+    private ButtonComponent button1;
+    private TextComponent buttonText2;
+    private ButtonComponent button2;
+    private TextComponent sliderText1;
+    private SliderComponent slider1;
+    private TextComponent sliderText2;
+    private SliderComponent slider2;
+    private Component component;
+    private TextComponent grid1;
+    private ButtonComponent grid2;
+    private ButtonComponent grid3;
+    private TextComponent grid4;
+    private ToggleComponent grid5;
+    private GridComponent grid;
+    private GroupedComponent groupedComponent;
+    private ButtonComponent buttonGraph;
+    private GraphicComponent graphic;
+    private ToggleComponent groupedToggle;
+    private ColorPickerComponent colorPickerComponent;
+    private TextComponent colorPickerText;
+    private FileBrowerComponent fileBrowerComponent;
+    private TextComponent fileBrowserText;
 
     public ComponentPanel() {
         super("Component Panel");
@@ -206,6 +214,21 @@ public final class ComponentPanel extends Panel {
                 });
 
 
+        colorPickerText = new TextComponent("Pick a color:").setColor(new Color(java.awt.Color.WHITE));
+        colorPickerComponent = new ColorPickerComponent("colorPickerComponent", new Color(java.awt.Color.BLUE))
+                .setOnChange(() -> {
+                    Color selectedColor = colorPickerComponent.color();
+                    System.out.println("Selected color: " + selectedColor);
+                    colorPickerText.setColor(selectedColor);
+                });
+
+        fileBrowserText = new TextComponent("File Browser:").setColor(new Color(java.awt.Color.WHITE));
+        fileBrowerComponent = new FileBrowerComponent("fileBrowserComponent", Path.of("./"), 20);
+        fileBrowerComponent.onFileSelected(file -> {
+            System.out.println("Selected file: " + file.getAbsolutePath());
+            fileBrowserText.setText("Selected: " + file.getName());
+        });
+
         // Build hierarchy in scoll area
 
         scrollArea.addChild(scrollAreaToggleComp);
@@ -231,6 +254,12 @@ public final class ComponentPanel extends Panel {
 
         scrollArea.addChild(buttonGraph);
         scrollArea.addChild(graphic);
+
+        scrollArea.addChild(colorPickerText);
+        scrollArea.addChild(colorPickerComponent);
+
+        scrollArea.addChild(fileBrowserText);
+        scrollArea.addChild(fileBrowerComponent);
     }
 
     @Override
@@ -239,7 +268,7 @@ public final class ComponentPanel extends Panel {
         UiRenderer r = ctx.renderer();
 
         ui.beginPanel(ctx.x(), ctx.y(), ctx.width(), ctx.height());
-        if (scrollAreaToggle){
+        if (scrollAreaToggle) {
             ui.scrollArea(r, scrollArea);
 
 
@@ -281,6 +310,13 @@ public final class ComponentPanel extends Panel {
 
             ui.button(r, buttonGraph);
             ui.graphic(r, graphic);
+
+            ui.label(r, colorPickerText);
+            ui.colorPicker(r, colorPickerComponent);
+
+            ui.label(r, fileBrowserText);
+            ui.fileBrowser(r, fileBrowerComponent);
+
         }
 
         ui.endPanel();
@@ -291,6 +327,7 @@ public final class ComponentPanel extends Panel {
     public void handleKey(UiContext ctx, KeyEvent e) {
         textFieldComponent.handleKey(ctx, e);
         comboComponent.handleKey(ctx, e);
+        fileBrowerComponent.handleKey(ctx, e);
     }
 
     @Override

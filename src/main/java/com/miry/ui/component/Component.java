@@ -39,7 +39,7 @@ public class Component {
                 ui.grid(renderer, (GridComponent) child);
             } else if (child instanceof SpacerComponent) {
                 ui.spacer((SpacerComponent) child);
-            } else if (child instanceof  SeparatorComponent) {
+            } else if (child instanceof SeparatorComponent) {
                 ui.separator(renderer, (SeparatorComponent) child);
             } else {
                 child.render(ui, renderer);
@@ -56,29 +56,30 @@ public class Component {
         return children;
     }
 
-    public void handleKey(UiContext uiContext, KeyEvent keyEvent){
+    public void handleKey(UiContext uiContext, KeyEvent keyEvent) {
         children.forEach(child -> child.handleKey(uiContext, keyEvent));
     }
 
-    public void handleTextInput(UiContext uiContext, TextInputEvent textInputEvent){
+    public void handleTextInput(UiContext uiContext, TextInputEvent textInputEvent) {
         children.forEach(child -> child.handleTextInput(uiContext, textInputEvent));
     }
 
-    public void handleFocus(UiContext uiContext, FocusEvent focusEvent){
+    public void handleFocus(UiContext uiContext, FocusEvent focusEvent) {
         children.forEach(child -> child.handleFocus(uiContext, focusEvent));
     }
 
-    public void handleMouseButton(UiContext uiContext, MouseButtonEvent mouseButtonEvent){
+    public void handleMouseButton(UiContext uiContext, MouseButtonEvent mouseButtonEvent) {
         children.forEach(child -> child.handleMouseButton(uiContext, mouseButtonEvent));
     }
 
-    public void handleMouseMove(UiContext uiContext, MouseMoveEvent mouseMoveEvent){
+    public void handleMouseMove(UiContext uiContext, MouseMoveEvent mouseMoveEvent) {
         children.forEach(child -> child.handleMouseMove(uiContext, mouseMoveEvent));
     }
 
-    public void handleScroll(UiContext uiContext, ScrollEvent scrollEvent){
+    public void handleScroll(UiContext uiContext, ScrollEvent scrollEvent) {
         children.forEach(child -> child.handleScroll(uiContext, scrollEvent));
     }
+
     public String getThemeId() {
         return themeId;
     }
@@ -88,5 +89,8 @@ public class Component {
         return this;
     }
 
+    public void clearChildren() {
+        children.clear();
+    }
 
 }

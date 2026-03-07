@@ -5,18 +5,21 @@ import com.miry.ui.component.*;
 import com.miry.ui.component.graphic.GraphicComponent;
 import com.miry.ui.component.graphic.GraphicDataSeries;
 import com.miry.ui.component.graphic.GraphicUtils;
+import com.miry.ui.component.widget.ColorPickerComponent;
+import com.miry.ui.component.widget.ComboBoxComponent;
+import com.miry.ui.component.widget.FileBrowerComponent;
+import com.miry.ui.component.widget.TextFieldComponent;
 import com.miry.ui.input.UiInput;
 import com.miry.ui.render.UiRenderer;
 import com.miry.ui.theme.Theme;
 import com.miry.ui.widgets.ComboBox;
+import com.miry.ui.widgets.FileBrowser;
 import com.miry.ui.widgets.TextField;
 import org.joml.Vector2f;
 
 import java.util.*;
-import java.util.function.BiConsumer;
 
 import static com.miry.ui.component.graphic.GraphicUtils.*;
-import static com.miry.ui.util.MathUtils.clamp01;
 
 /**
  * Immediate-mode UI (IMUI) helper for rapid prototyping and layout-driven panels.
@@ -659,39 +662,7 @@ public final class Ui {
         scrollArea(r, sc, rect);
     }
 
-    private void renderComponentFlow(UiRenderer r, Component c) {
-        if (c == null) return;
 
-        if (c instanceof ButtonComponent bc) {
-            button(r, bc); // version flow (nextRect)
-        } else if (c instanceof TextComponent tc) {
-            label(r, tc);  // version flow (nextRect)
-        } else if (c instanceof TextureComponent tex) {
-            // à toi d'adapter selon ton TextureComponent (width/height)
-            image(r, tex.getTexture(), tex.getWidth(), tex.getHeight(), tex.getTintArgb()); // version flow (nextRect)
-        } else if (c instanceof SliderComponent sc) {
-            sliderFloat(r, sc); // version flow (nextRect)
-        } else if (c instanceof ToggleComponent tc) {
-            toggle(r, tc); // version flow (nextRect)
-        } else if (c instanceof GridComponent gc) {
-            grid(r, gc);   // grid gère cursorY elle-même
-        } else if (c instanceof GroupedComponent gc) {
-            group(r, gc);  // group gère cursorY elle-même
-        } else if (c instanceof ScrollAreaComponent sac) {
-            Rect rr = nextRect(theme.tokens.itemHeight * 6);
-            scrollArea(r, sac, rr);
-        } else if (c instanceof GraphicComponent graph) {
-            Rect rr = nextRect(graph.getHeight());
-            graphic(r, graph, rr);
-        } else if (c instanceof TextFieldComponent tf) {
-            textField(r, tf);
-        } else if (c instanceof ComboBoxComponent<?> cb) {
-            comboBox(r, cb);
-        } else {
-            Rect rr = nextRect(theme.tokens.itemHeight);
-            drawPlaceHolder(rr, c, r);
-        }
-    }
 
     private void image(UiRenderer r, TextureComponent component, Rect rect) {
         int iw = Math.min(component.getWidth(), rect.w);
@@ -902,10 +873,7 @@ public final class Ui {
 
         popId();
     }
-
-    // Update your renderComponent switch to support GraphicComponent.
-// Keep comments in English.
-
+    //render tools
     private void renderComponent(UiRenderer r, Component c, Rect rect) {
         if (c instanceof ButtonComponent bc) {
             button(r, bc, rect);
@@ -921,6 +889,10 @@ public final class Ui {
             textField(r, tfc, rect);
         }else if (c instanceof ComboBoxComponent<?> cbc) {
             comboBox(r, (ComboBoxComponent<Object>) cbc, rect);
+        } else if (c instanceof ColorPickerComponent cpc) {
+            colorPicker(r, cpc, rect);
+        } else if (c instanceof FileBrowerComponent fb) {
+            fileBrowser(r, fb, rect);
         } else if (c instanceof ScrollAreaComponent sc) {
             scrollArea(r, sc, rect);
         } else if (c instanceof GraphicComponent gc) {
@@ -949,6 +921,44 @@ public final class Ui {
             separator(r, sep);
         } else {
             drawPlaceHolder(rect, c, r);
+        }
+    }
+
+    private void renderComponentFlow(UiRenderer r, Component c) {
+        if (c == null) return;
+
+        if (c instanceof ButtonComponent bc) {
+            button(r, bc); // version flow (nextRect)
+        } else if (c instanceof TextComponent tc) {
+            label(r, tc);  // version flow (nextRect)
+        } else if (c instanceof TextureComponent tex) {
+            // à toi d'adapter selon ton TextureComponent (width/height)
+            image(r, tex.getTexture(), tex.getWidth(), tex.getHeight(), tex.getTintArgb()); // version flow (nextRect)
+        } else if (c instanceof SliderComponent sc) {
+            sliderFloat(r, sc); // version flow (nextRect)
+        } else if (c instanceof ToggleComponent tc) {
+            toggle(r, tc); // version flow (nextRect)
+        } else if (c instanceof GridComponent gc) {
+            grid(r, gc);   // grid gère cursorY elle-même
+        } else if (c instanceof GroupedComponent gc) {
+            group(r, gc);  // group gère cursorY elle-même
+        } else if (c instanceof ScrollAreaComponent sac) {
+            Rect rr = nextRect(theme.tokens.itemHeight * 6);
+            scrollArea(r, sac, rr);
+        } else if (c instanceof GraphicComponent graph) {
+            Rect rr = nextRect(graph.getHeight());
+            graphic(r, graph, rr);
+        } else if (c instanceof TextFieldComponent tf) {
+            textField(r, tf);
+        } else if (c instanceof ComboBoxComponent<?> cb) {
+            comboBox(r, cb);
+        }  else if (c instanceof ColorPickerComponent cpc) {
+            colorPicker(r, cpc);
+        } else if (c instanceof FileBrowerComponent fb) {
+            fileBrowser(r, fb);
+        } else {
+            Rect rr = nextRect(theme.tokens.itemHeight);
+            drawPlaceHolder(rr, c, r);
         }
     }
 
@@ -1480,6 +1490,162 @@ public final class Ui {
 
     public void setContext(UiContext uiContext) {
         this.uiContext = uiContext;
+    }
+
+    /**
+     * Renders a {@link ColorPickerComponent} using the base {@link com.miry.ui.widgets.ColorPicker} widget rendering logic.
+     *
+     * <p>Behavior:</p>
+     * <ul>
+     *   <li>Allocates a fixed widget box (uses {@link Theme} design sizes when possible).</li>
+     *   <li>Delegates all interaction + visuals to {@link com.miry.ui.widgets.ColorPicker#render(UiRenderer, UiInput, Theme, int, int, int, int, boolean)}.</li>
+     *   <li>If the color changed during this frame and {@code component.getOnChange() != null}, runs the callback.</li>
+     * </ul>
+     *
+     * <p>Notes:</p>
+     * <ul>
+     *   <li>This widget is not "row-height": it needs a larger height. We choose a reasonable default that adapts to theme.</li>
+     *   <li>For "rect-based layout" (grid/group), create an overload {@code colorPicker(r, component, rect)} like your other widgets.</li>
+     * </ul>
+     *
+     * @param r The renderer.
+     * @param colorPickerComponent The component wrapper holding the {@link com.miry.ui.widgets.ColorPicker} instance.
+     */
+    public void colorPicker(UiRenderer r, com.miry.ui.component.widget.ColorPickerComponent colorPickerComponent) {
+        if (r == null || colorPickerComponent == null) return;
+
+        pushId(colorPickerComponent.getId());
+
+        // A color picker needs real space. Use theme tokens if you have them; otherwise fall back.
+        // Width: full content width (flow), Height: reasonable default.
+        int minH = 220; // safe fallback
+        int h = minH;
+
+        // If you have design tokens for large widgets, use them.
+        // (Your Theme has design.widget_height_xl etc in ColorPicker widget; keep it conservative here.)
+        if (theme != null && theme.design != null) {
+            // try to approximate a good height using existing design scales
+            h = Math.max(minH, theme.design.widget_height_xl * 6); // e.g. 40*6=240
+        }
+
+        Rect rect = nextRect(h);
+
+        colorPicker(r, colorPickerComponent, rect);
+
+        popId();
+    }
+
+    /**
+     * Rect-based overload for grid/group rendering.
+     *
+     * <p>Uses the provided rect exactly, and does not touch cursorY.</p>
+     *
+     * @param r The renderer.
+     * @param colorPickerComponent The component wrapper holding the widget instance.
+     * @param rect The allocated rect (from grid/group).
+     */
+    private void colorPicker(UiRenderer r, com.miry.ui.component.widget.ColorPickerComponent colorPickerComponent, Rect rect) {
+        if (r == null || colorPickerComponent == null) return;
+
+        pushId(colorPickerComponent.getId());
+
+        boolean changed = colorPickerComponent.colorPicker().render(
+                r,
+                input(),
+                theme,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                true
+        );
+
+        if (changed) {
+            Runnable cb = colorPickerComponent.getOnChange();
+            if (cb != null) cb.run();
+        }
+
+        popId();
+    }
+
+    /**
+     * Renders a {@link FileBrowerComponent} using the underlying {@link com.miry.ui.widgets.FileBrowser} widget logic.
+     *
+     * <p>This method integrates the widget into the IMUI layout system:</p>
+     * <ul>
+     *   <li>Allocates a rectangle in the current flow (like other components).</li>
+     *   <li>Wraps the widget in a {@link ScrollAreaComponent}-like behavior using the existing Ui.beginScrollArea / endScrollArea.</li>
+     *   <li>Computes {@code contentHeight} from the widget ({@link FileBrowser#computeContentHeight()} ()}).</li>
+     *   <li>Propagates the scroll offset to the widget via {@code scrollArea.scrollY()}.</li>
+     *   <li>Triggers {@code onFileSelected} when selection changes (and callback is not null).</li>
+     * </ul>
+     *
+     * <p>Height behavior:</p>
+     * <ul>
+     *   <li>If {@code component} has no explicit height concept, we default to "fill remaining panel height"
+     *       (same behavior as your ScrollAreaComponent default).</li>
+     * </ul>
+     */
+    public void fileBrowser(UiRenderer r, FileBrowerComponent component) {
+        if (r == null || component == null) return;
+
+        pushId(component.getId());
+
+        int h = Math.max(1, this.contentH - cursorY);
+        Rect rect = nextRect(h);
+
+        fileBrowser(r, component, rect);
+
+        popId();
+    }
+
+    /**
+     * Rect-based overload for Grid/Group placement.
+     *
+     * <p>Uses the given rect exactly and does not touch cursorY.</p>
+     */
+    private void fileBrowser(UiRenderer r, FileBrowerComponent component, Rect rect) {
+        if (r == null || component == null) return;
+
+        pushId(component.getId());
+
+        // Compute content height (TreeView is a list -> perfect for scroll area)
+        int contentH = Math.max(rect.h, component.computeContentHeight());
+
+        // We need a stable key for scroll state; using the component id is fine.
+        String key = component.getId();
+
+        Ui.ScrollArea area = beginScrollArea(r, key, rect.x, rect.y, rect.w, rect.h, contentH);
+
+        // Pass the scroll offset to the widget (widget expects an int)
+        int scrollOffset = Math.round(area.scrollY());
+
+        // Keep track of selection changes to trigger callback once.
+        java.io.File before = component.selectedFile();
+
+        // Render the widget INSIDE the scroll area clipping.
+        // Note: we use the scroll area's renderer so clipping is active.
+        component.fileBrowser().render(
+                area.renderer(),
+                uiContext,
+                input(),
+                theme,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                scrollOffset,
+                true
+        );
+
+        java.io.File after = component.selectedFile();
+        if (after != before) {
+            component.triggerFileSelected(after);
+        }
+
+        endScrollArea(area);
+
+        popId();
     }
 
     private static final class Anim {
