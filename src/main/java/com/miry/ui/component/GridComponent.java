@@ -55,6 +55,14 @@ public class GridComponent extends Component {
         return cellHeight;
     }
 
+    public void setCellWidth(int cellWidth) {
+        this.cellWidth = cellWidth;
+    }
+
+    public void setCellHeight(int cellHeight) {
+        this.cellHeight = cellHeight;
+    }
+
     public Component[][] getGrid() {
         return cells;
     }

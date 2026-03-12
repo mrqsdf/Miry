@@ -888,7 +888,7 @@ public final class Ui {
         } else if (c instanceof TextFieldComponent tfc) {
             textField(r, tfc, rect);
         }else if (c instanceof ComboBoxComponent<?> cbc) {
-            comboBox(r, (ComboBoxComponent<Object>) cbc, rect);
+            comboBox(r, cbc, rect);
         } else if (c instanceof ColorPickerComponent cpc) {
             colorPicker(r, cpc, rect);
         } else if (c instanceof FileBrowerComponent fb) {
@@ -919,6 +919,8 @@ public final class Ui {
             spacer(sp);
         } else if (c instanceof SeparatorComponent sep) {
             separator(r, sep);
+        } else if (c instanceof GroupedComponent group) {
+            group(r, group, rect);
         } else {
             drawPlaceHolder(rect, c, r);
         }
@@ -956,13 +958,46 @@ public final class Ui {
             colorPicker(r, cpc);
         } else if (c instanceof FileBrowerComponent fb) {
             fileBrowser(r, fb);
+        } else if (c instanceof SeparatorComponent sep) {
+            separator(r, sep);
+        } else if (c instanceof SpacerComponent spa) {
+            spacer(spa);
         } else {
             Rect rr = nextRect(theme.tokens.itemHeight);
             drawPlaceHolder(rr, c, r);
         }
     }
 
+    /**
+     * Renders a GroupedComponent in flow layout (allocates its own rect).
+     *
+     * <p>Behavior:</p>
+     * <ul>
+     *   <li>Allocates one "line" using {@link #nextRect(int)} (height = itemHeight).</li>
+     *   <li>Then delegates to {@link #group(UiRenderer, GroupedComponent, Rect)} so group can also be used in Grid/Rect layouts.</li>
+     * </ul>
+     */
     public void group(UiRenderer r, GroupedComponent component) {
+        if (component == null) return;
+
+        // One-line group by default
+        int lineH = Math.max(1, theme.tokens.itemHeight);
+        Rect rect = nextRect(lineH);
+
+        group(r, component, rect);
+    }
+
+    /**
+     * Renders a GroupedComponent inside an already allocated Rect (grid/group/any layout).
+     *
+     * <p>Important:</p>
+     * <ul>
+     *   <li>This method MUST NOT use cursorX/cursorY/contentW from the outer layout.</li>
+     *   <li>It must layout children relative to the provided rect and keep everything on a single line.</li>
+     *   <li>It must NOT advance cursorY (caller owns layout flow).</li>
+     * </ul>
+     */
+    public void group(UiRenderer r, GroupedComponent component, Rect rect) {
         List<Component> children = component.getChildren();
         if (children == null || children.isEmpty()) return;
 
@@ -970,21 +1005,24 @@ public final class Ui {
 
         final int gap = Math.max(0, theme.tokens.itemSpacing);
 
-        final int startX = cursorX;
-        final int startY = cursorY;
+        // Layout origin = the given rect (NOT cursorX/cursorY)
+        final int startX = rect.x;
+        final int startY = rect.y;
 
-        final int lineH = Math.max(1, theme.tokens.itemHeight);
+        // Line height = rect.h (so the group respects the rect you give it)
+        final int lineH = Math.max(1, rect.h);
 
         final int n = children.size();
 
-        int[] desiredW = new int[n];
+        int[] desiredW = new int[n]; // <=0 => flex
         int fixedSum = 0;
         int flexCount = 0;
 
+        // Measure desired widths (same as your current logic)
         for (int i = 0; i < n; i++) {
             Component c = children.get(i);
 
-            int w = -1;
+            int w = -1; // flex by default
 
             if (c instanceof TextComponent tc) {
                 List<TextComponent> parts = new ArrayList<>();
@@ -996,6 +1034,7 @@ public final class Ui {
                 }
                 w = Math.max(1, Math.round(width) + 2);
             } else if (c instanceof TextureComponent) {
+                // simple square placeholder
                 w = lineH;
             } else {
                 w = -1;
@@ -1007,9 +1046,11 @@ public final class Ui {
             else flexCount++;
         }
 
+        // Available width comes from the rect (NOT contentW)
         int totalGap = gap * Math.max(0, n - 1);
-        int available = Math.max(1, contentW - totalGap);
+        int available = Math.max(1, rect.w - totalGap);
 
+        // If fixed widths overflow, scale them down proportionally
         if (fixedSum > available && fixedSum > 0) {
             float s = (float) available / (float) fixedSum;
             fixedSum = 0;
@@ -1036,6 +1077,11 @@ public final class Ui {
                 w = Math.max(1, w);
             }
 
+            // Clamp: never exceed the rect bounds (safe)
+            if (x + w > rect.x + rect.w) {
+                w = Math.max(1, (rect.x + rect.w) - x);
+            }
+
             Rect rc = rect(x, startY, w, lineH);
 
             pushId(i);
@@ -1043,9 +1089,10 @@ public final class Ui {
             popId();
 
             x += w + gap;
-        }
 
-        cursorY = startY + lineH + theme.tokens.itemSpacing;
+            // If we run out of space, stop (avoid negative widths)
+            if (x >= rect.x + rect.w) break;
+        }
 
         popId();
     }
