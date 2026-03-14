@@ -267,6 +267,8 @@ public final class ComponentPanel extends Panel {
         Ui ui = ctx.ui();
         UiRenderer r = ctx.renderer();
 
+
+
         ui.beginPanel(ctx.x(), ctx.y(), ctx.width(), ctx.height());
         if (scrollAreaToggle) {
             ui.scrollArea(r, scrollArea);

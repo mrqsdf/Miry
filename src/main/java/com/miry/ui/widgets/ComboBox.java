@@ -55,6 +55,11 @@ public final class ComboBox<T> extends BaseWidget {
         }
     }
 
+    public void setSelectedItem(T item) {
+        int idx = items.indexOf(item);
+        setSelectedIndex(idx);
+    }
+
     public T selected() {
         return selectedIndex >= 0 && selectedIndex < items.size() ? items.get(selectedIndex) : null;
     }

@@ -18,6 +18,7 @@ import com.miry.ui.widgets.TextField;
 import org.joml.Vector2f;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 import static com.miry.ui.component.graphic.GraphicUtils.*;
 
@@ -123,7 +124,6 @@ public final class Ui {
         contentH = Math.max(1, height - theme.tokens.padding * 2);
         cursorX = contentX;
         cursorY = contentY;
-
     }
 
     /**
@@ -168,125 +168,42 @@ public final class Ui {
      * @return {@code true} if the button was clicked this frame.
      */
     public boolean button(UiRenderer r, String label) {
-        int id = id(label);
+        String safeLabel = label == null ? "" : label;
+        int id = id(safeLabel);
         Rect rect = nextRect(theme.tokens.itemHeight);
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        if (hovered) {
-            hotId = id;
-        }
 
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-
-        boolean clicked = false;
-        if (activeId == id && hovered && input.mouseReleased()) {
-            clicked = true;
-            activeId = 0;
-        }
-        if (activeId == id && input.mouseReleased() && !hovered) {
-            activeId = 0;
-        }
-
-        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        if (activeId == id) {
-            bg = Theme.lerpArgb(theme.widgetHover, theme.widgetActive, 0.35f);
-        }
-
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            float radius = theme.design.radius_sm;
-            int border = theme.design.border_thin;
-            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
-        }
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 10, baselineY, theme.text.getArgb());
-
-        return clicked;
+        return renderButton(
+                r,
+                id,
+                rect,
+                theme.widgetBg,
+                theme.widgetHover,
+                theme.widgetActive,
+                (x, baselineY) -> r.drawText(safeLabel, x, baselineY, theme.text.getArgb())
+        );
     }
 
-    //todo add doc
     public boolean button(UiRenderer r, ButtonComponent component) {
-        TextComponent labelComp = component.getLabel();
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(labelComp, components);
-        int id = id(component.getId());
         Rect rect = nextRect(theme.tokens.itemHeight);
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        boolean clicked = buttonAction(hovered, id);
-        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(component.getBgColor(this), component.getHoverColor(this), hoverT);
-        if (activeId == id) {
-            bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
-        }
-
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            float radius = theme.design.radius_sm;
-            int border = theme.design.border_thin;
-            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
-        }
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x + 10;
-        drawTextComponents(r, components, x, baselineY);
-        if (clicked && component.getOnClick() != null) {
-            component.getOnClick().run();
-        }
-
-        return clicked;
+        return button(r, component, rect);
     }
 
     private boolean button(UiRenderer r, ButtonComponent component, Rect rect) {
-        TextComponent labelComp = component.getLabel();
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(labelComp, components);
         int id = id(component.getId());
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        boolean clicked = buttonAction(hovered, id);
-        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(component.getBgColor(this), component.getHoverColor(this), hoverT);
-        if (activeId == id) {
-            bg = Theme.lerpArgb(component.getHoverColor(this), component.getActiveColor(this), 0.35f);
-        }
+        boolean clicked = renderButton(
+                r,
+                id,
+                rect,
+                component.getBgColor(this),
+                component.getHoverColor(this),
+                component.getActiveColor(this),
+                (x, baselineY) -> drawTextComponents(r, component.getLabel(), x, baselineY)
+        );
 
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            float radius = theme.design.radius_sm;
-            int border = theme.design.border_thin;
-            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
-        }
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x + 10;
-        drawTextComponents(r, components, x, baselineY);
         if (clicked && component.getOnClick() != null) {
             component.getOnClick().run();
         }
 
-        return clicked;
-    }
-
-    private boolean buttonAction(boolean hovered, int id) {
-        boolean clicked = false;
-        if (hovered) {
-            hotId = id;
-        }
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-        if (activeId == id && hovered && input.mouseReleased()) {
-            clicked = true;
-            activeId = 0;
-        }
-        if (activeId == id && input.mouseReleased() && !hovered) {
-            activeId = 0;
-        }
         return clicked;
     }
 
@@ -299,92 +216,36 @@ public final class Ui {
      * @return The new state of the toggle (toggled if clicked).
      */
     public boolean toggle(UiRenderer r, String label, boolean value) {
-        int id = id(label);
+        String safeLabel = label == null ? "" : label;
+        int id = id(safeLabel);
         Rect rect = nextRect(theme.tokens.itemHeight);
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        if (hovered) {
-            hotId = id;
-        }
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-        if (activeId == id && hovered && input.mouseReleased()) {
-            value = !value;
-            activeId = 0;
-        }
-        if (activeId == id && input.mouseReleased() && !hovered) {
-            activeId = 0;
-        }
 
-        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            float radius = theme.design.radius_sm;
-            int border = theme.design.border_thin;
-            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
-        }
-
-        int box = rect.h - 10;
-        float boxR = Math.min(3.0f, theme.design.radius_sm);
-        int boxFill = value ? theme.widgetActive.getArgb() : theme.widgetOutline.getArgb();
-        r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 6 + box + 10, baselineY, theme.text.getArgb());
-        return value;
+        return renderToggle(
+                r,
+                id,
+                rect,
+                value,
+                v -> v ? theme.widgetActive.getArgb() : theme.widgetOutline.getArgb(),
+                (x, baselineY) -> r.drawText(safeLabel, x, baselineY, theme.text.getArgb())
+        );
     }
 
-    //todo add doc
     public boolean toggle(UiRenderer r, ToggleComponent component) {
         Rect rect = nextRect(theme.tokens.itemHeight);
         return toggle(r, component, rect);
     }
 
     private boolean toggle(UiRenderer r, ToggleComponent component, Rect rect) {
-        int id = id(component.getId());
-        boolean value = component.isToggled();
-        boolean changed = false;
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        if (hovered) {
-            hotId = id;
-        }
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-        if (activeId == id && hovered && input.mouseReleased()) {
-            value = !value;
-            changed = true;
-            activeId = 0;
-        }
-        if (activeId == id && input.mouseReleased() && !hovered) {
-            activeId = 0;
-        }
+        boolean value = renderToggle(
+                r,
+                id(component.getId()),
+                rect,
+                component.isToggled(),
+                v -> component.getToggleColor(this).getArgb(),
+                (x, baselineY) -> drawTextComponents(r, component.getLabel(), x, baselineY)
+        );
 
-        float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            float radius = theme.design.radius_sm;
-            int border = theme.design.border_thin;
-            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, radius, border, bg, outline);
-        }
-
-        int box = rect.h - 10;
-        float boxR = Math.min(3.0f, theme.design.radius_sm);
-        int boxFill = component.getToggleColor(this).getArgb();
-        r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, boxFill);
-
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(component.getLabel(), components);
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x + 6 + box + 10;
-        drawTextComponents(r, components, x, baselineY);
-
-        if (changed) {
+        if (value != component.isToggled()) {
             component.toggle();
         }
 
@@ -459,108 +320,47 @@ public final class Ui {
      * @return The updated value.
      */
     public float sliderFloat(UiRenderer r, String label, float value, float min, float max) {
-        int id = id(label);
+        String safeLabel = label == null ? "" : label;
         Rect rect = nextRect(theme.tokens.itemHeight);
 
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        if (hovered) {
-            hotId = id;
-        }
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-        if (activeId == id && input.mouseDown()) {
-            float t = (mouse.x - rect.x) / rect.w;
-            t = clamp01(t);
-            value = min + (max - min) * t;
-        }
-        if (activeId == id && input.mouseReleased()) {
-            activeId = 0;
-        }
-
-        float hoverT = anim(id).step((hovered || activeId == id) ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(theme.widgetBg, theme.widgetHover, hoverT);
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
-        }
-
-        float t = (value - min) / (max - min);
-        t = clamp01(t);
-        float fillW = rect.w * t;
-        int fill = theme.widgetActive.getArgb();
-        float fillRadius = Math.max(0.0f, theme.design.radius_sm - 1);
-        if (fillW > 1.0f) {
-            r.drawRoundedRect(rect.x + 1, rect.y + 1, Math.max(0.0f, fillW - 2.0f), rect.h - 2, fillRadius, fill);
-        }
-
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        r.drawText(label, rect.x + 10, baselineY, theme.text.getArgb());
-        return value;
+        return renderSlider(
+                r,
+                id(safeLabel),
+                rect,
+                value,
+                min,
+                max,
+                theme.widgetBg,
+                theme.widgetHover,
+                theme.widgetActive,
+                (x, baselineY) -> r.drawText(safeLabel, x, baselineY, theme.text.getArgb())
+        ).value();
     }
 
-    //todo add doc
     public float sliderFloat(UiRenderer r, SliderComponent component) {
         Rect rect = nextRect(theme.tokens.itemHeight);
         return sliderFloat(r, component, rect);
     }
 
     private float sliderFloat(UiRenderer r, SliderComponent component, Rect rect) {
-        TextComponent labelComp = component.getLabel();
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(labelComp, components);
-        int id = id(component.getId());
-        float min = component.getMin();
-        float max = component.getMax();
-        float value = component.getValue();
-        boolean changed = false;
+        SliderResult result = renderSlider(
+                r,
+                id(component.getId()),
+                rect,
+                component.getValue(),
+                component.getMin(),
+                component.getMax(),
+                component.getBackgroundColor(this),
+                component.getHoverColor(this),
+                component.getActiveColor(this),
+                (x, baselineY) -> drawTextComponents(r, component.getLabel(), x, baselineY)
+        );
 
-        boolean hovered = rect.contains(mouse.x, mouse.y);
-        if (hovered) {
-            hotId = id;
-        }
-        if (hovered && input.mousePressed()) {
-            activeId = id;
-        }
-        if (activeId == id && input.mouseDown()) {
-            float t = (mouse.x - rect.x) / rect.w;
-            t = clamp01(t);
-            value = min + (max - min) * t;
-            changed = true;
-        }
-        if (activeId == id && input.mouseReleased()) {
-            activeId = 0;
+        if (result.changed()) {
+            component.slider(result.value());
         }
 
-        float hoverT = anim(id).step((hovered || activeId == id) ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-        int bg = Theme.lerpArgb(component.getBackgroundColor(this), component.getHoverColor(this), hoverT);
-        int outline = theme.widgetOutline.getArgb();
-        if (theme.skins.widget != null) {
-            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
-        } else {
-            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
-        }
-
-        float t = (value - min) / (max - min);
-        t = clamp01(t);
-        float fillW = rect.w * t;
-        int fill = component.getActiveColor(this).getArgb();
-        float fillRadius = Math.max(0.0f, theme.design.radius_sm - 1);
-        if (fillW > 1.0f) {
-            r.drawRoundedRect(rect.x + 1, rect.y + 1, Math.max(0.0f, fillW - 2.0f), rect.h - 2, fillRadius, fill);
-        }
-
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x + 10;
-        drawTextComponents(r, components, x, baselineY);
-
-        if (changed) {
-            component.slider(value);
-        }
-
-        return value;
+        return result.value();
     }
 
     /**
@@ -574,9 +374,7 @@ public final class Ui {
      */
     public void image(UiRenderer r, Texture texture, int width, int height, int tintArgb) {
         Rect rect = nextRect(height);
-        int iw = Math.min(width, rect.w);
-        int ih = Math.min(height, rect.h);
-        r.drawTexturedRect(texture, rect.x, rect.y, iw, ih, tintArgb);
+        image(r, texture, width, height, tintArgb, rect);
     }
 
     public void image(UiRenderer r, TextureComponent component) {
@@ -606,7 +404,6 @@ public final class Ui {
     public void scrollArea(UiRenderer r, ScrollAreaComponent sc, Rect rect) {
         pushId(sc.getId() == null ? "scroll" : sc.getId());
 
-        // Optional vertical offset inside the provided rect
         final int yOffset = Math.max(0, sc.getYOffset());
         final int viewX = rect.x;
         final int viewY = rect.y + yOffset;
@@ -619,12 +416,10 @@ public final class Ui {
         Ui.ScrollArea area = beginScrollArea(r, key, viewX, viewY, viewW, viewH, cachedContentH);
         UiRenderer sr = area.renderer();
 
-        // Render children in flow layout inside the scroll area
         for (Component child : sc.getChildren()) {
             renderComponentFlow(sr, child);
         }
 
-        // Update contentHeight based on what was actually consumed this frame
         int usedContentH = Math.max(viewH, (cursorY - contentY));
         sc.setContentHeight(usedContentH);
 
@@ -662,14 +457,6 @@ public final class Ui {
         scrollArea(r, sc, rect);
     }
 
-
-
-    private void image(UiRenderer r, TextureComponent component, Rect rect) {
-        int iw = Math.min(component.getWidth(), rect.w);
-        int ih = Math.min(component.getHeight(), rect.h);
-        r.drawTexturedRect(component.getTexture(), rect.x, rect.y, iw, ih, component.getTintArgb());
-    }
-
     public void label(UiRenderer r, String text, boolean muted) {
         Rect rect = nextRect(theme.tokens.itemHeight);
         int color = muted ? theme.textMuted.getArgb() : theme.text.getArgb();
@@ -677,52 +464,16 @@ public final class Ui {
         r.drawText(text, rect.x, baselineY, color);
     }
 
-    //todo add doc
-
     public void label(UiRenderer r, TextComponent text) {
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(text, components);
         Rect rect = nextRect(theme.tokens.itemHeight);
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x;
-        drawTextComponents(r, components, x, baselineY);
+        label(r, text, rect);
     }
 
-    private void label(UiRenderer r, TextComponent text, Rect rect) {
-        List<TextComponent> components = new ArrayList<>();
-        collectTextComponents(text, components);
-        float baselineY = r.baselineForBox(rect.y, rect.h);
-        int x = rect.x;
-        drawTextComponents(r, components, x, baselineY);
-    }
-
-    //todo add doc
-    private void collectTextComponents(TextComponent text, List<TextComponent> components) {
-        components.add(text);
-        for (Component child : text.getChildren()) {
-            if (child instanceof TextComponent textComponent) {
-                collectTextComponents(textComponent, components);
-            }
-        }
-    }
-
-    private int drawTextComponents(UiRenderer r, List<TextComponent> components, int x, float y) {
-        int currentX = x;
-        for (TextComponent comp : components) {
-            int color = comp.getThemeId() != null ? theme.getColor(comp.getThemeId()).getArgb() : comp.getColor(this).getArgb();
-            r.drawText(comp.getText(), currentX, y, color);
-            currentX += (int) (r.measureText(comp.getText()) + 4);
-        }
-        return currentX;
-    }
-
-    //todo add doc
     public void renderComponent(UiRenderer r, Component component) {
         component.render(this, r);
     }
 
     public void grid(UiRenderer r, GridComponent component) {
-
         pushId(component.getId());
 
         Component[][] cells = component.getGrid();
@@ -742,21 +493,13 @@ public final class Ui {
             return;
         }
 
-        // "CSS gap" (use theme spacing for now)
         final int gap = Math.max(0, theme.tokens.itemSpacing);
-
-        // "row height" default (until GridComponent exposes something like getRowHeight())
         final int rowH = Math.max(1, component.getCellHeight());
-
-        // Grid origin (current cursor position, like flow layout)
         final int startX = cursorX;
         final int startY = cursorY;
-
-        // Column width distribution (equal columns for now)
         final int totalGapW = gap * (cols - 1);
         final int colW = Math.max(1, (contentW - totalGapW) / cols);
 
-        // Precompute cell rects
         Rect[][] rects = new Rect[rows][cols];
         for (int rr = 0; rr < rows; rr++) {
             for (int cc = 0; cc < cols; cc++) {
@@ -766,16 +509,15 @@ public final class Ui {
             }
         }
 
-        // Collect spans by component instance (same reference)
         Map<Component, int[]> bounds = new IdentityHashMap<>();
         for (int rr = 0; rr < rows; rr++) {
             Component[] row = cells[rr];
             for (int cc = 0; cc < cols; cc++) {
                 Component c = (row != null && cc < row.length) ? row[cc] : null;
                 if (c == null) continue;
+
                 int[] b = bounds.get(c);
                 if (b == null) {
-                    // minR, minC, maxR, maxC
                     b = new int[]{rr, cc, rr, cc};
                     bounds.put(c, b);
                 } else {
@@ -787,11 +529,10 @@ public final class Ui {
             }
         }
 
-        // Validate "rectangular span" for each component; otherwise split into per-cell draws.
         Set<Component> nonRectangular = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Map.Entry<Component, int[]> e : bounds.entrySet()) {
-            Component c = e.getKey();
-            int[] b = e.getValue();
+        for (Map.Entry<Component, int[]> entry : bounds.entrySet()) {
+            Component c = entry.getKey();
+            int[] b = entry.getValue();
             int minR = b[0], minC = b[1], maxR = b[2], maxC = b[3];
 
             boolean ok = true;
@@ -805,12 +546,14 @@ public final class Ui {
                     }
                 }
             }
-            if (!ok) nonRectangular.add(c);
+
+            if (!ok) {
+                nonRectangular.add(c);
+            }
         }
 
         boolean[][] consumed = new boolean[rows][cols];
 
-        // Render grid
         for (int rr = 0; rr < rows; rr++) {
             Component[] row = cells[rr];
 
@@ -820,8 +563,6 @@ public final class Ui {
                 Component c = (row != null && cc < row.length) ? row[cc] : null;
                 if (c == null) continue;
 
-
-                // If component span is non-rectangular, render per cell
                 if (nonRectangular.contains(c)) {
                     Rect cellR = rects[rr][cc];
                     consumed[rr][cc] = true;
@@ -832,17 +573,14 @@ public final class Ui {
                     continue;
                 }
 
-                // Rectangular span
                 int[] b = bounds.get(c);
                 int minR = b[0], minC = b[1], maxR = b[2], maxC = b[3];
 
-                // Only draw at top-left of the span
                 if (rr != minR || cc != minC) {
                     consumed[rr][cc] = true;
                     continue;
                 }
 
-                // Mark consumed area
                 for (int rrr = minR; rrr <= maxR; rrr++) {
                     for (int ccc = minC; ccc <= maxC; ccc++) {
                         if (rrr >= 0 && rrr < rows && ccc >= 0 && ccc < cols) {
@@ -854,12 +592,12 @@ public final class Ui {
                 Rect a = rects[minR][minC];
                 Rect z = rects[maxR][maxC];
 
-                int spanX = a.x;
-                int spanY = a.y;
-                int spanW = (z.x + z.w) - a.x;
-                int spanH = (z.y + z.h) - a.y;
-
-                Rect spanRect = rect(spanX, spanY, spanW, spanH);
+                Rect spanRect = rect(
+                        a.x,
+                        a.y,
+                        (z.x + z.w) - a.x,
+                        (z.y + z.h) - a.y
+                );
 
                 pushId(minR * 73856093 ^ minC * 19349663);
                 renderComponent(r, c, spanRect);
@@ -867,13 +605,12 @@ public final class Ui {
             }
         }
 
-        // Advance cursor like a block layout: total grid height + itemSpacing
         int gridH = rows * rowH + gap * (rows - 1);
         cursorY = startY + gridH + theme.tokens.itemSpacing;
 
         popId();
     }
-    //render tools
+
     private void renderComponent(UiRenderer r, Component c, Rect rect) {
         if (c instanceof ButtonComponent bc) {
             button(r, bc, rect);
@@ -887,7 +624,7 @@ public final class Ui {
             toggle(r, tc, rect);
         } else if (c instanceof TextFieldComponent tfc) {
             textField(r, tfc, rect);
-        }else if (c instanceof ComboBoxComponent<?> cbc) {
+        } else if (c instanceof ComboBoxComponent<?> cbc) {
             comboBox(r, cbc, rect);
         } else if (c instanceof ColorPickerComponent cpc) {
             colorPicker(r, cpc, rect);
@@ -896,23 +633,7 @@ public final class Ui {
         } else if (c instanceof ScrollAreaComponent sc) {
             scrollArea(r, sc, rect);
         } else if (c instanceof GraphicComponent gc) {
-            // Render the graphic inside the given rect without breaking external layout.
-            layoutStack.push(new LayoutState(contentX, contentY, contentW, cursorX, cursorY));
-
-            contentX = rect.x;
-            contentY = rect.y;
-            contentW = rect.w;
-            cursorX = rect.x;
-            cursorY = rect.y;
-
-            graphic(r, gc, rect);
-
-            LayoutState prev = layoutStack.pop();
-            contentX = prev.contentX();
-            contentY = prev.contentY();
-            contentW = prev.contentW();
-            cursorX = prev.cursorX();
-            cursorY = prev.cursorY();
+            withRectLayout(rect, () -> graphic(r, gc, rect));
         } else if (c instanceof GridComponent gc) {
             grid(r, gc);
         } else if (c instanceof SpacerComponent sp) {
@@ -930,20 +651,19 @@ public final class Ui {
         if (c == null) return;
 
         if (c instanceof ButtonComponent bc) {
-            button(r, bc); // version flow (nextRect)
+            button(r, bc);
         } else if (c instanceof TextComponent tc) {
-            label(r, tc);  // version flow (nextRect)
+            label(r, tc);
         } else if (c instanceof TextureComponent tex) {
-            // à toi d'adapter selon ton TextureComponent (width/height)
-            image(r, tex.getTexture(), tex.getWidth(), tex.getHeight(), tex.getTintArgb()); // version flow (nextRect)
+            image(r, tex);
         } else if (c instanceof SliderComponent sc) {
-            sliderFloat(r, sc); // version flow (nextRect)
+            sliderFloat(r, sc);
         } else if (c instanceof ToggleComponent tc) {
-            toggle(r, tc); // version flow (nextRect)
+            toggle(r, tc);
         } else if (c instanceof GridComponent gc) {
-            grid(r, gc);   // grid gère cursorY elle-même
+            grid(r, gc);
         } else if (c instanceof GroupedComponent gc) {
-            group(r, gc);  // group gère cursorY elle-même
+            group(r, gc);
         } else if (c instanceof ScrollAreaComponent sac) {
             Rect rr = nextRect(theme.tokens.itemHeight * 6);
             scrollArea(r, sac, rr);
@@ -954,7 +674,7 @@ public final class Ui {
             textField(r, tf);
         } else if (c instanceof ComboBoxComponent<?> cb) {
             comboBox(r, cb);
-        }  else if (c instanceof ColorPickerComponent cpc) {
+        } else if (c instanceof ColorPickerComponent cpc) {
             colorPicker(r, cpc);
         } else if (c instanceof FileBrowerComponent fb) {
             fileBrowser(r, fb);
@@ -980,7 +700,6 @@ public final class Ui {
     public void group(UiRenderer r, GroupedComponent component) {
         if (component == null) return;
 
-        // One-line group by default
         int lineH = Math.max(1, theme.tokens.itemHeight);
         Rect rect = nextRect(lineH);
 
@@ -1004,59 +723,32 @@ public final class Ui {
         pushId(component.getId() == null ? "group" : component.getId());
 
         final int gap = Math.max(0, theme.tokens.itemSpacing);
-
-        // Layout origin = the given rect (NOT cursorX/cursorY)
         final int startX = rect.x;
         final int startY = rect.y;
-
-        // Line height = rect.h (so the group respects the rect you give it)
         final int lineH = Math.max(1, rect.h);
-
         final int n = children.size();
 
-        int[] desiredW = new int[n]; // <=0 => flex
+        int[] desiredW = new int[n];
         int fixedSum = 0;
         int flexCount = 0;
 
-        // Measure desired widths (same as your current logic)
         for (int i = 0; i < n; i++) {
-            Component c = children.get(i);
-
-            int w = -1; // flex by default
-
-            if (c instanceof TextComponent tc) {
-                List<TextComponent> parts = new ArrayList<>();
-                collectTextComponents(tc, parts);
-
-                float width = 0f;
-                for (TextComponent part : parts) {
-                    width += r.measureText(part.getText()) + 4f;
-                }
-                w = Math.max(1, Math.round(width) + 2);
-            } else if (c instanceof TextureComponent) {
-                // simple square placeholder
-                w = lineH;
-            } else {
-                w = -1;
-            }
-
+            int w = preferredGroupWidth(r, children.get(i), lineH);
             desiredW[i] = w;
 
             if (w > 0) fixedSum += w;
             else flexCount++;
         }
 
-        // Available width comes from the rect (NOT contentW)
         int totalGap = gap * Math.max(0, n - 1);
         int available = Math.max(1, rect.w - totalGap);
 
-        // If fixed widths overflow, scale them down proportionally
         if (fixedSum > available && fixedSum > 0) {
-            float s = (float) available / (float) fixedSum;
+            float scale = (float) available / (float) fixedSum;
             fixedSum = 0;
             for (int i = 0; i < n; i++) {
                 if (desiredW[i] > 0) {
-                    desiredW[i] = Math.max(1, Math.round(desiredW[i] * s));
+                    desiredW[i] = Math.max(1, Math.round(desiredW[i] * scale));
                     fixedSum += desiredW[i];
                 }
             }
@@ -1068,7 +760,7 @@ public final class Ui {
 
         int x = startX;
         for (int i = 0; i < n; i++) {
-            Component c = children.get(i);
+            Component child = children.get(i);
 
             int w = desiredW[i];
             if (w <= 0) {
@@ -1077,7 +769,6 @@ public final class Ui {
                 w = Math.max(1, w);
             }
 
-            // Clamp: never exceed the rect bounds (safe)
             if (x + w > rect.x + rect.w) {
                 w = Math.max(1, (rect.x + rect.w) - x);
             }
@@ -1085,36 +776,18 @@ public final class Ui {
             Rect rc = rect(x, startY, w, lineH);
 
             pushId(i);
-            renderComponent(r, c, rc);
+            renderComponent(r, child, rc);
             popId();
 
             x += w + gap;
 
-            // If we run out of space, stop (avoid negative widths)
             if (x >= rect.x + rect.w) break;
         }
 
         popId();
     }
 
-    private void drawPlaceHolder(Rect rc, Component c, UiRenderer r) {
-        int bg = theme.widgetBg.getArgb();
-        int outline = theme.widgetOutline.getArgb();
-        r.drawRect(rc.x, rc.y, rc.w, rc.h, bg);
-        // tiny outline effect
-        r.drawRect(rc.x, rc.y, rc.w, 1, outline);
-        r.drawRect(rc.x, rc.y + rc.h - 1, rc.w, 1, outline);
-        r.drawRect(rc.x, rc.y, 1, rc.h, outline);
-        r.drawRect(rc.x + rc.w - 1, rc.y, 1, rc.h, outline);
-
-        String name = (c == null) ? "empty" : c.getClass().getSimpleName();
-        float by = r.baselineForBox(rc.y, rc.h);
-        r.drawText(name, rc.x + 6, by, theme.textMuted.getArgb());
-    }
-
     public void graphic(UiRenderer r, GraphicComponent component) {
-        // Render as a fixed-size widget that does NOT break the layout flow.
-        // Width is clamped to the available content width, height is respected.
         pushId(component.getId());
 
         int w = Math.max(1, Math.min(component.getWidth(), contentW));
@@ -1129,9 +802,6 @@ public final class Ui {
     }
 
     private void graphic(UiRenderer r, GraphicComponent component, Rect rect) {
-        // High-level layout: Title (top), Plot (center), Legend (right or bottom), Axis labels.
-        // We keep everything inside rect and use clipping to avoid overflowing.
-
         final int bg = theme.widgetBg.getArgb();
         final int outline = theme.widgetOutline.getArgb();
         final int text = theme.text.getArgb();
@@ -1140,17 +810,14 @@ public final class Ui {
         r.flush();
         r.pushClip(rect.x, rect.y, rect.w, rect.h);
 
-        // Background and border
         r.drawRoundedRect(rect.x, rect.y, rect.w, rect.h, theme.design.radius_sm, bg, theme.design.border_thin, outline);
 
-        // Padding inside the chart widget
         final int pad = Math.max(6, theme.tokens.padding);
         int x0 = rect.x + pad;
         int y0 = rect.y + pad;
         int x1 = rect.x + rect.w - pad;
         int y1 = rect.y + rect.h - pad;
 
-        // Title area
         final int titleH = (!isNullOrBlank(component.getTitle())) ? (int) Math.ceil(r.lineHeight() + 6) : 0;
         if (titleH > 0) {
             String title = component.getTitle();
@@ -1161,7 +828,6 @@ public final class Ui {
             y0 += titleH;
         }
 
-        // Decide legend placement: right if enough width, otherwise bottom
         final boolean wantLegend = component.isShowLegend();
         final int legendMinW = 110;
         final int legendMaxW = 180;
@@ -1176,7 +842,6 @@ public final class Ui {
 
         if (wantLegend && seriesCount > 0) {
             int availableW = x1 - x0;
-            // Prefer right legend when there's enough horizontal space
             if (availableW >= (legendMinW + 220)) {
                 legendRight = true;
                 legendW = clampInt(legendMaxW, legendMinW, Math.max(legendMinW, availableW / 3));
@@ -1190,36 +855,28 @@ public final class Ui {
             }
         }
 
-        // Axis label areas
         final int axisLabelH = (!isNullOrBlank(component.getAxisXLabel())) ? (int) Math.ceil(r.lineHeight() + 4) : 0;
         final int axisLabelW = (!isNullOrBlank(component.getAxisYLabel())) ? (int) Math.ceil(r.lineHeight() + 4) : 0;
 
-        // Plot area (reserve space for axis labels and tick labels)
-        final int tickLabelPad = 6;
-        final int yTicksW = axisLabelW + 26; // left side for Y values + Y label
-        final int xTicksH = axisLabelH + 22; // bottom for X values + X label
+        final int yTicksW = axisLabelW + 26;
+        final int xTicksH = axisLabelH + 22;
 
         int plotX0 = x0 + yTicksW;
         int plotY0 = y0 + 6;
         int plotX1 = x1 - 6;
         int plotY1 = y1 - xTicksH;
 
-        // Safety clamp
         if (plotX1 <= plotX0 + 10 || plotY1 <= plotY0 + 10) {
-            // Not enough space: just draw placeholder message
             String msg = "Graphic: not enough space";
             r.drawText(msg, x0, r.baselineForBox(y0, Math.max(1, y1 - y0)), textMuted);
             r.popClip();
             return;
         }
 
-        // Compute scaling based on explicit min/max, or auto-scale from points with padding
         GraphicUtils.Scale scale = graphicUtils.computeScale(component, points, plotX0, plotY0, plotX1, plotY1);
 
-        // Draw grid (optional) and axes (always)
         graphicUtils.drawAxesAndGrid(r, component, plotX0, plotY0, plotX1, plotY1, scale);
 
-        // Draw chart by type
         switch (component.getType()) {
             case LINE -> graphicUtils.drawLineChart(r, component, plotX0, plotY0, plotX1, plotY1, scale, false);
             case AREA -> graphicUtils.drawLineChart(r, component, plotX0, plotY0, plotX1, plotY1, scale, true);
@@ -1234,10 +891,8 @@ public final class Ui {
             }
         }
 
-        // Draw axis labels
         graphicUtils.drawAxisLabels(r, component, x0, y0, x1, y1, plotX0, plotY0, plotX1, plotY1);
 
-        // Draw legend
         if (wantLegend && seriesCount > 0 && (legendW > 0 && legendH > 0)) {
             if (legendRight) {
                 graphicUtils.drawLegendRight(r, component, points, x1 + legendGap, y0, legendW, legendH);
@@ -1253,7 +908,7 @@ public final class Ui {
         cursorY += Math.max(0, pixels);
     }
 
-    public void spacer(SpacerComponent component){
+    public void spacer(SpacerComponent component) {
         spacer(component.getSpacer());
     }
 
@@ -1265,7 +920,7 @@ public final class Ui {
         separator(r, color, 1);
     }
 
-    public void separator(UiRenderer r, SeparatorComponent component){
+    public void separator(UiRenderer r, SeparatorComponent component) {
         separator(r, component.getColor(this), component.getThickness());
     }
 
@@ -1276,7 +931,6 @@ public final class Ui {
     }
 
     public void textField(UiRenderer r, TextFieldComponent component) {
-        // Default layout: use one row height (like other widgets)
         Rect rect = nextRect(theme.tokens.itemHeight);
         textField(r, component, rect);
     }
@@ -1285,66 +939,48 @@ public final class Ui {
         if (r == null || component == null) return;
 
         TextField tf = component.textField();
-
-        // Compute hover/press state for visuals (TextField will also do it, but it needs input+ctx anyway)
         boolean hovered = rect.contains(mouse.x, mouse.y);
-
-        // Use full widget render to restore focus on click
         UiContext ctx = this.uiContext;
 
-        // If ctx is missing, we fall back to raw rendering (no focus possible)
         if (ctx == null) {
             int id = id(component.getId());
             float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
 
-            Color bg = component.getBgColor(this);
-            Color hoverBg = component.getHoverColor(this);
+            int bgFinal = Theme.lerpArgb(
+                    component.getBgColor(this),
+                    component.getHoverColor(this),
+                    hoverT
+            );
             int fg = component.getTextColor(this).getArgb();
             int caret = theme.widgetActive.getArgb();
 
-            int bgFinal = Theme.lerpArgb(bg, hoverBg, hoverT);
             tf.render(r, rect.x, rect.y, rect.w, rect.h, bgFinal, fg, caret);
             r.drawRectOutline(rect.x, rect.y, rect.w, rect.h, Math.max(1, theme.design.border_thin), theme.widgetOutline.getArgb());
             return;
         }
 
-        // Temporarily patch theme colors so TextField uses your component colors.
-        // This keeps the original TextField behavior (focus, selection, caret blinking, etc.)
-        // while letting your component control colors.
-        Color prevWidgetBg = new Color(theme.widgetBg.getArgb());
-        Color prevWidgetHover = new Color(theme.widgetHover.getArgb());
-        Color prevText = new Color(theme.text.getArgb());
-
-
-        try {
-            // Theme expects colors; your component returns Color with ARGB.
-            // If theme.widgetBg is your own Color class, adapt accordingly.
-            theme.widgetBg.set(component.getBgColor(this));
-            theme.widgetHover.set(component.getHoverColor(this));
-            theme.text.set(component.getTextColor(this));
-
-            // Render with full interaction (focus + pressed + hover)
-            tf.render(
-                    r,
-                    ctx,
-                    input(),
-                    theme,
-                    rect.x,
-                    rect.y,
-                    rect.w,
-                    rect.h,
-                    true
-            );
-        } finally {
-            // Restore theme state to avoid affecting other widgets
-            theme.widgetBg.set(prevWidgetBg);
-            theme.widgetHover.set(prevWidgetHover);
-            theme.text.set(prevText);
-        }
+        withTemporaryThemeColors(
+                component.getBgColor(this),
+                component.getHoverColor(this),
+                component.getTextColor(this),
+                () -> {
+                    tf.render(
+                            r,
+                            ctx,
+                            input(),
+                            theme,
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            true
+                    );
+                    return null;
+                }
+        );
     }
 
     public <T> boolean comboBox(UiRenderer r, ComboBoxComponent<T> component) {
-        // Default layout: use one row height (like other widgets)
         Rect rect = nextRect(theme.tokens.itemHeight);
         return comboBox(r, component, rect);
     }
@@ -1355,43 +991,30 @@ public final class Ui {
         ComboBox<T> cb = component.comboBox();
         UiContext ctx = this.uiContext;
 
-        // Resolve component colors once (component already handles theme fallback)
         Color bgColor = component.getBgColor(this);
         Color hoverColor = component.getHoverColor(this);
         Color textColor = component.getTextColor(this);
 
-        // If no context, we can still render a basic button and popup, but focus/overlay is limited.
-        // We prefer not to break: render button + immediate popup (no overlay queue).
         if (ctx == null) {
             int id = id(component.getId());
-            boolean hovered = rect.contains(mouse.x, mouse.y);
+            InteractionState state = clickableState(rect, id);
+            int bgFinal = Theme.lerpArgb(
+                    bgColor,
+                    hoverColor,
+                    anim(id).step(state.hovered() ? 1.0f : 0.0f, dt, theme.tokens.animSpeed)
+            );
 
-            // IMUI press/active handling for the button
-            boolean clicked = false;
-            if (hovered) hotId = id;
-            if (hovered && input.mousePressed()) activeId = id;
-            if (activeId == id && hovered && input.mouseReleased()) {
-                clicked = true;
-                activeId = 0;
+            if (state.clicked()) {
+                cb.setOpen(!cb.isOpen());
             }
-            if (activeId == id && input.mouseReleased() && !hovered) activeId = 0;
 
-            float hoverT = anim(id).step(hovered ? 1.0f : 0.0f, dt, theme.tokens.animSpeed);
-            int bgFinal = Theme.lerpArgb(bgColor, hoverColor, hoverT);
-
-            // Toggle popup on click
-            if (clicked) cb.setOpen(!cb.isOpen());
-
-            // Render button
             cb.renderButton(r, rect.x, rect.y, rect.w, rect.h, bgFinal, textColor.getArgb());
             r.drawRectOutline(rect.x, rect.y, rect.w, rect.h, Math.max(1, theme.design.border_thin), theme.widgetOutline.getArgb());
 
-            // Render popup directly (no overlay pass)
             boolean changed = false;
             if (cb.isOpen()) {
                 int popupX = rect.x;
                 int popupY = rect.y + rect.h;
-
                 int popupMaxH = Math.max(theme.tokens.itemHeight * 6, rect.h * 6);
                 int itemH = theme.tokens.itemHeight;
 
@@ -1401,74 +1024,466 @@ public final class Ui {
                     int before = cb.selectedIndex();
                     boolean consumed = cb.handlePopupClick((int) mouse.x, (int) mouse.y, popupX, popupY, rect.w, popupMaxH, itemH);
                     changed = before != cb.selectedIndex();
-                    if (!consumed && !hovered) cb.setOpen(false);
+                    if (!consumed && !state.hovered()) {
+                        cb.setOpen(false);
+                    }
                 }
 
-                int popupBg = theme.panelBg.getArgb();
-                int popupHover = hoverColor.getArgb();
-                cb.renderPopup(r, popupX, popupY, rect.w, popupMaxH, itemH, popupBg, popupHover, textColor.getArgb(), hoverIndex);
+                cb.renderPopup(
+                        r,
+                        popupX,
+                        popupY,
+                        rect.w,
+                        popupMaxH,
+                        itemH,
+                        theme.panelBg.getArgb(),
+                        hoverColor.getArgb(),
+                        textColor.getArgb(),
+                        hoverIndex
+                );
             }
 
             return changed;
         }
 
-        // Context available: use the full ComboBox.render(...) so focus + overlay works properly.
-        // We temporarily patch theme colors so the widget uses component colors.
-        // This matches the TextField approach (save -> set -> render -> restore).
+        return withTemporaryThemeColors(
+                bgColor,
+                hoverColor,
+                textColor,
+                () -> cb.render(
+                        r,
+                        ctx,
+                        input(),
+                        theme,
+                        rect.x,
+                        rect.y,
+                        rect.w,
+                        rect.h,
+                        Math.max(theme.tokens.itemHeight * 8, rect.h * 8),
+                        theme.tokens.itemHeight,
+                        true,
+                        true
+                )
+        );
+    }
 
-        Color prevWidgetBg = new Color(theme.widgetBg.getArgb());
-        Color prevWidgetHover = new Color(theme.widgetHover.getArgb());
-        Color prevText = new Color(theme.text.getArgb());
-        Color prevPanelBg = new Color(theme.panelBg.getArgb());
+    /**
+     * Renders a {@link ColorPickerComponent} using the base {@link com.miry.ui.widgets.ColorPicker} widget rendering logic.
+     *
+     * <p>Behavior:</p>
+     * <ul>
+     *   <li>Allocates a fixed widget box (uses {@link Theme} design sizes when possible).</li>
+     *   <li>Delegates all interaction + visuals to {@link com.miry.ui.widgets.ColorPicker#render(UiRenderer, UiInput, Theme, int, int, int, int, boolean)}.</li>
+     *   <li>If the color changed during this frame and {@code component.getOnChange() != null}, runs the callback.</li>
+     * </ul>
+     *
+     * <p>Notes:</p>
+     * <ul>
+     *   <li>This widget is not "row-height": it needs a larger height. We choose a reasonable default that adapts to theme.</li>
+     *   <li>For "rect-based layout" (grid/group), create an overload {@code colorPicker(r, component, rect)} like your other widgets.</li>
+     * </ul>
+     *
+     * @param r The renderer.
+     * @param colorPickerComponent The component wrapper holding the {@link com.miry.ui.widgets.ColorPicker} instance.
+     */
+    public void colorPicker(UiRenderer r, ColorPickerComponent colorPickerComponent) {
+        if (r == null || colorPickerComponent == null) return;
 
-        try {
-            // Apply component colors
-            theme.widgetBg.set(bgColor);
-            theme.widgetHover.set(hoverColor);
-            theme.text.set(textColor);
+        int minH = 220;
+        int h = minH;
 
-            // Popup background usually uses panelBg; keep theme panel bg, or you can override if desired.
-            // Here we keep it stable (but we still restore because we captured it).
-            // theme.panelBg.set(...);
+        if (theme != null && theme.design != null) {
+            h = Math.max(minH, theme.design.widget_height_xl * 6);
+        }
 
-            int popupMaxH = Math.max(theme.tokens.itemHeight * 8, rect.h * 8);
-            int itemH = theme.tokens.itemHeight;
+        Rect rect = nextRect(h);
+        colorPicker(r, colorPickerComponent, rect);
+    }
 
-            // Defer popup so it renders above other UI automatically via ctx.overlay()
-            boolean deferPopup = true;
+    /**
+     * Rect-based overload for grid/group rendering.
+     *
+     * <p>Uses the provided rect exactly, and does not touch cursorY.</p>
+     *
+     * @param r The renderer.
+     * @param colorPickerComponent The component wrapper holding the widget instance.
+     * @param rect The allocated rect (from grid/group).
+     */
+    private void colorPicker(UiRenderer r, ColorPickerComponent colorPickerComponent, Rect rect) {
+        if (r == null || colorPickerComponent == null) return;
 
-            return cb.render(
-                    r,
-                    ctx,
-                    input(),
-                    theme,
-                    rect.x,
-                    rect.y,
-                    rect.w,
-                    rect.h,
-                    popupMaxH,
-                    itemH,
-                    true,
-                    deferPopup
+        pushId(colorPickerComponent.getId());
+
+        boolean changed = colorPickerComponent.colorPicker().render(
+                r,
+                input(),
+                theme,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                true
+        );
+
+        if (changed) {
+            Runnable cb = colorPickerComponent.getOnChange();
+            if (cb != null) cb.run();
+        }
+
+        popId();
+    }
+
+    /**
+     * Renders a {@link FileBrowerComponent} using the underlying {@link com.miry.ui.widgets.FileBrowser} widget logic.
+     *
+     * <p>This method integrates the widget into the IMUI layout system:</p>
+     * <ul>
+     *   <li>Allocates a rectangle in the current flow (like other components).</li>
+     *   <li>Wraps the widget in a {@link ScrollAreaComponent}-like behavior using the existing Ui.beginScrollArea / endScrollArea.</li>
+     *   <li>Computes {@code contentHeight} from the widget ({@link FileBrowser#computeContentHeight()}).</li>
+     *   <li>Propagates the scroll offset to the widget via {@code scrollArea.scrollY()}.</li>
+     *   <li>Triggers {@code onFileSelected} when selection changes (and callback is not null).</li>
+     * </ul>
+     *
+     * <p>Height behavior:</p>
+     * <ul>
+     *   <li>If {@code component} has no explicit height concept, we default to "fill remaining panel height"
+     *       (same behavior as your ScrollAreaComponent default).</li>
+     * </ul>
+     */
+    public void fileBrowser(UiRenderer r, FileBrowerComponent component) {
+        if (r == null || component == null) return;
+
+        int h = Math.max(1, this.contentH - cursorY);
+        Rect rect = nextRect(h);
+
+        fileBrowser(r, component, rect);
+    }
+
+    /**
+     * Rect-based overload for Grid/Group placement.
+     *
+     * <p>Uses the given rect exactly and does not touch cursorY.</p>
+     */
+    private void fileBrowser(UiRenderer r, FileBrowerComponent component, Rect rect) {
+        if (r == null || component == null) return;
+
+        pushId(component.getId());
+
+        int contentH = Math.max(rect.h, component.computeContentHeight());
+        String key = component.getId();
+
+        Ui.ScrollArea area = beginScrollArea(r, key, rect.x, rect.y, rect.w, rect.h, contentH);
+
+        int scrollOffset = Math.round(area.scrollY());
+        java.io.File before = component.selectedFile();
+
+        component.fileBrowser().render(
+                area.renderer(),
+                uiContext,
+                input(),
+                theme,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                scrollOffset,
+                true
+        );
+
+        java.io.File after = component.selectedFile();
+        if (after != before) {
+            component.triggerFileSelected(after);
+        }
+
+        endScrollArea(area);
+
+        popId();
+    }
+
+    public void setContext(UiContext uiContext) {
+        this.uiContext = uiContext;
+    }
+
+    private boolean renderButton(
+            UiRenderer r,
+            int id,
+            Rect rect,
+            Color bgColor,
+            Color hoverColor,
+            Color activeColor,
+            TextDrawer contentDrawer
+    ) {
+        InteractionState state = clickableState(rect, id);
+        int bg = buttonBackground(id, state.hovered(), bgColor, hoverColor, activeColor);
+        drawWidgetBackground(r, rect, bg, true);
+        contentDrawer.draw(rect.x + 10, r.baselineForBox(rect.y, rect.h));
+        return state.clicked();
+    }
+
+    private boolean renderToggle(
+            UiRenderer r,
+            int id,
+            Rect rect,
+            boolean value,
+            ToggleFillProvider fillProvider,
+            TextDrawer contentDrawer
+    ) {
+        InteractionState state = clickableState(rect, id);
+        boolean newValue = state.clicked() ? !value : value;
+
+        int bg = widgetBackground(id, state.hovered(), theme.widgetBg, theme.widgetHover);
+        drawWidgetBackground(r, rect, bg, true);
+
+        int box = rect.h - 10;
+        float boxR = Math.min(3.0f, theme.design.radius_sm);
+        r.drawRoundedRect(rect.x + 6, rect.y + 5, box, box, boxR, fillProvider.color(newValue));
+
+        contentDrawer.draw(rect.x + 6 + box + 10, r.baselineForBox(rect.y, rect.h));
+        return newValue;
+    }
+
+    private SliderResult renderSlider(
+            UiRenderer r,
+            int id,
+            Rect rect,
+            float value,
+            float min,
+            float max,
+            Color bgColor,
+            Color hoverColor,
+            Color activeColor,
+            TextDrawer contentDrawer
+    ) {
+        DragState state = dragState(rect, id);
+        boolean changed = false;
+
+        if (state.active() && input.mouseDown()) {
+            float t = clamp01((mouse.x - rect.x) / rect.w);
+            value = min + (max - min) * t;
+            changed = true;
+        }
+
+        int bg = widgetBackground(id, state.hovered() || state.active(), bgColor, hoverColor);
+        drawWidgetBackground(r, rect, bg, false);
+
+        float range = max - min;
+        float t = range == 0.0f ? 0.0f : clamp01((value - min) / range);
+        float fillW = rect.w * t;
+        if (fillW > 1.0f) {
+            r.drawRoundedRect(
+                    rect.x + 1,
+                    rect.y + 1,
+                    Math.max(0.0f, fillW - 2.0f),
+                    rect.h - 2,
+                    Math.max(0.0f, theme.design.radius_sm - 1),
+                    activeColor.getArgb()
             );
-        } finally {
-            // Restore theme colors to avoid affecting other widgets
-            theme.widgetBg.set(prevWidgetBg);
-            theme.widgetHover.set(prevWidgetHover);
-            theme.text.set(prevText);
-            theme.panelBg.set(prevPanelBg);
+        }
+
+        contentDrawer.draw(rect.x + 10, r.baselineForBox(rect.y, rect.h));
+        return new SliderResult(value, changed);
+    }
+
+    private InteractionState clickableState(Rect rect, int id) {
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        boolean clicked = buttonAction(hovered, id);
+        return new InteractionState(hovered, clicked);
+    }
+
+    private DragState dragState(Rect rect, int id) {
+        boolean hovered = rect.contains(mouse.x, mouse.y);
+        if (hovered) {
+            hotId = id;
+        }
+        if (hovered && input.mousePressed()) {
+            activeId = id;
+        }
+
+        boolean active = activeId == id;
+
+        if (active && input.mouseReleased()) {
+            activeId = 0;
+        }
+
+        return new DragState(hovered, active);
+    }
+
+    private boolean buttonAction(boolean hovered, int id) {
+        boolean clicked = false;
+        if (hovered) {
+            hotId = id;
+        }
+        if (hovered && input.mousePressed()) {
+            activeId = id;
+        }
+        if (activeId == id && hovered && input.mouseReleased()) {
+            clicked = true;
+            activeId = 0;
+        }
+        if (activeId == id && input.mouseReleased() && !hovered) {
+            activeId = 0;
+        }
+        return clicked;
+    }
+
+    private int widgetBackground(int id, boolean highlighted, Color bgColor, Color hoverColor) {
+        return Theme.lerpArgb(
+                bgColor,
+                hoverColor,
+                anim(id).step(highlighted ? 1.0f : 0.0f, dt, theme.tokens.animSpeed)
+        );
+    }
+
+    private int buttonBackground(int id, boolean hovered, Color bgColor, Color hoverColor, Color activeColor) {
+        int bg = widgetBackground(id, hovered, bgColor, hoverColor);
+        if (activeId == id) {
+            bg = Theme.lerpArgb(hoverColor, activeColor, 0.35f);
+        }
+        return bg;
+    }
+
+    private void drawWidgetBackground(UiRenderer r, Rect rect, int bg, boolean beveled) {
+        int outline = theme.widgetOutline.getArgb();
+        if (theme.skins.widget != null) {
+            theme.skins.widget.drawWithOutline(r, rect.x, rect.y, rect.w, rect.h, bg, outline, 1);
+            return;
+        }
+
+        if (beveled) {
+            drawBevelButton(r, rect.x, rect.y, rect.w, rect.h, theme.design.radius_sm, theme.design.border_thin, bg, outline);
+        } else {
+            r.drawRect(rect.x, rect.y, rect.w, rect.h, bg);
         }
     }
 
-    private static void drawBevelButton(UiRenderer r,
-                                        float x,
-                                        float y,
-                                        float w,
-                                        float h,
-                                        float radius,
-                                        int borderPx,
-                                        int bg,
-                                        int outline) {
+    private void image(UiRenderer r, Texture texture, int width, int height, int tintArgb, Rect rect) {
+        int iw = Math.min(width, rect.w);
+        int ih = Math.min(height, rect.h);
+        r.drawTexturedRect(texture, rect.x, rect.y, iw, ih, tintArgb);
+    }
+
+    private void image(UiRenderer r, TextureComponent component, Rect rect) {
+        image(r, component.getTexture(), component.getWidth(), component.getHeight(), component.getTintArgb(), rect);
+    }
+
+    private void label(UiRenderer r, TextComponent text, Rect rect) {
+        drawTextComponents(r, text, rect.x, r.baselineForBox(rect.y, rect.h));
+    }
+
+    private void collectTextComponents(TextComponent text, List<TextComponent> components) {
+        if (text == null) return;
+
+        components.add(text);
+        for (Component child : text.getChildren()) {
+            if (child instanceof TextComponent textComponent) {
+                collectTextComponents(textComponent, components);
+            }
+        }
+    }
+
+    private List<TextComponent> flattenTextComponents(TextComponent text) {
+        List<TextComponent> components = new ArrayList<>();
+        collectTextComponents(text, components);
+        return components;
+    }
+
+    private int drawTextComponents(UiRenderer r, TextComponent text, int x, float y) {
+        return drawTextComponents(r, flattenTextComponents(text), x, y);
+    }
+
+    private int drawTextComponents(UiRenderer r, List<TextComponent> components, int x, float y) {
+        int currentX = x;
+        for (TextComponent comp : components) {
+            int color = comp.getThemeId() != null
+                    ? theme.getColor(comp.getThemeId()).getArgb()
+                    : comp.getColor(this).getArgb();
+            String part = comp.getText() == null ? "" : comp.getText();
+            r.drawText(part, currentX, y, color);
+            currentX += (int) (r.measureText(part) + 4);
+        }
+        return currentX;
+    }
+
+    private int measureTextComponents(UiRenderer r, TextComponent text) {
+        int width = 0;
+        for (TextComponent comp : flattenTextComponents(text)) {
+            width += (int) (r.measureText(comp.getText() == null ? "" : comp.getText()) + 4);
+        }
+        return width;
+    }
+
+    private int preferredGroupWidth(UiRenderer r, Component c, int lineH) {
+        if (c instanceof TextComponent tc) {
+            return Math.max(1, measureTextComponents(r, tc) + 2);
+        }
+        if (c instanceof TextureComponent) {
+            return lineH;
+        }
+        return -1;
+    }
+
+    private void drawPlaceHolder(Rect rc, Component c, UiRenderer r) {
+        int bg = theme.widgetBg.getArgb();
+        int outline = theme.widgetOutline.getArgb();
+        r.drawRect(rc.x, rc.y, rc.w, rc.h, bg);
+        r.drawRect(rc.x, rc.y, rc.w, 1, outline);
+        r.drawRect(rc.x, rc.y + rc.h - 1, rc.w, 1, outline);
+        r.drawRect(rc.x, rc.y, 1, rc.h, outline);
+        r.drawRect(rc.x + rc.w - 1, rc.y, 1, rc.h, outline);
+
+        String name = (c == null) ? "empty" : c.getClass().getSimpleName();
+        float by = r.baselineForBox(rc.y, rc.h);
+        r.drawText(name, rc.x + 6, by, theme.textMuted.getArgb());
+    }
+
+    private void withRectLayout(Rect rect, Runnable action) {
+        layoutStack.push(new LayoutState(contentX, contentY, contentW, cursorX, cursorY));
+        try {
+            contentX = rect.x;
+            contentY = rect.y;
+            contentW = rect.w;
+            cursorX = rect.x;
+            cursorY = rect.y;
+            action.run();
+        } finally {
+            LayoutState prev = layoutStack.pop();
+            contentX = prev.contentX();
+            contentY = prev.contentY();
+            contentW = prev.contentW();
+            cursorX = prev.cursorX();
+            cursorY = prev.cursorY();
+        }
+    }
+
+    private <T> T withTemporaryThemeColors(Color widgetBg, Color widgetHover, Color text, Supplier<T> supplier) {
+        Color prevWidgetBg = new Color(theme.widgetBg.getArgb());
+        Color prevWidgetHover = new Color(theme.widgetHover.getArgb());
+        Color prevText = new Color(theme.text.getArgb());
+
+        try {
+            theme.widgetBg.set(widgetBg);
+            theme.widgetHover.set(widgetHover);
+            theme.text.set(text);
+            return supplier.get();
+        } finally {
+            theme.widgetBg.set(prevWidgetBg);
+            theme.widgetHover.set(prevWidgetHover);
+            theme.text.set(prevText);
+        }
+    }
+
+    private static void drawBevelButton(
+            UiRenderer r,
+            float x,
+            float y,
+            float w,
+            float h,
+            float radius,
+            int borderPx,
+            int bg,
+            int outline
+    ) {
         int t = Math.max(1, borderPx);
         if (w <= t * 2.0f || h <= t * 2.0f) {
             r.drawRect(x, y, w, h, bg);
@@ -1485,8 +1500,6 @@ public final class Ui {
         r.drawRoundedRect(x + t, y + t, w - t * 2.0f, 1.0f, Math.max(0.0f, radius - t - 1.0f), hl);
     }
 
-    // (no outline helper; nine-slice outline uses NineSlice.drawWithOutline)
-
     private Rect nextRect(int height) {
         int h = Math.max(1, height);
         Rect r = new Rect(cursorX, cursorY, contentW, h);
@@ -1499,7 +1512,7 @@ public final class Ui {
     }
 
     private int id(String s) {
-        return mix(idSeed, hash32(s));
+        return mix(idSeed, hash32(s == null ? "" : s));
     }
 
     private Anim anim(int id) {
@@ -1535,164 +1548,23 @@ public final class Ui {
         return px >= x && py >= y && px < (x + w) && py < (y + h);
     }
 
-    public void setContext(UiContext uiContext) {
-        this.uiContext = uiContext;
+    @FunctionalInterface
+    private interface TextDrawer {
+        void draw(int x, float baselineY);
     }
 
-    /**
-     * Renders a {@link ColorPickerComponent} using the base {@link com.miry.ui.widgets.ColorPicker} widget rendering logic.
-     *
-     * <p>Behavior:</p>
-     * <ul>
-     *   <li>Allocates a fixed widget box (uses {@link Theme} design sizes when possible).</li>
-     *   <li>Delegates all interaction + visuals to {@link com.miry.ui.widgets.ColorPicker#render(UiRenderer, UiInput, Theme, int, int, int, int, boolean)}.</li>
-     *   <li>If the color changed during this frame and {@code component.getOnChange() != null}, runs the callback.</li>
-     * </ul>
-     *
-     * <p>Notes:</p>
-     * <ul>
-     *   <li>This widget is not "row-height": it needs a larger height. We choose a reasonable default that adapts to theme.</li>
-     *   <li>For "rect-based layout" (grid/group), create an overload {@code colorPicker(r, component, rect)} like your other widgets.</li>
-     * </ul>
-     *
-     * @param r The renderer.
-     * @param colorPickerComponent The component wrapper holding the {@link com.miry.ui.widgets.ColorPicker} instance.
-     */
-    public void colorPicker(UiRenderer r, com.miry.ui.component.widget.ColorPickerComponent colorPickerComponent) {
-        if (r == null || colorPickerComponent == null) return;
-
-        pushId(colorPickerComponent.getId());
-
-        // A color picker needs real space. Use theme tokens if you have them; otherwise fall back.
-        // Width: full content width (flow), Height: reasonable default.
-        int minH = 220; // safe fallback
-        int h = minH;
-
-        // If you have design tokens for large widgets, use them.
-        // (Your Theme has design.widget_height_xl etc in ColorPicker widget; keep it conservative here.)
-        if (theme != null && theme.design != null) {
-            // try to approximate a good height using existing design scales
-            h = Math.max(minH, theme.design.widget_height_xl * 6); // e.g. 40*6=240
-        }
-
-        Rect rect = nextRect(h);
-
-        colorPicker(r, colorPickerComponent, rect);
-
-        popId();
+    @FunctionalInterface
+    private interface ToggleFillProvider {
+        int color(boolean value);
     }
 
-    /**
-     * Rect-based overload for grid/group rendering.
-     *
-     * <p>Uses the provided rect exactly, and does not touch cursorY.</p>
-     *
-     * @param r The renderer.
-     * @param colorPickerComponent The component wrapper holding the widget instance.
-     * @param rect The allocated rect (from grid/group).
-     */
-    private void colorPicker(UiRenderer r, com.miry.ui.component.widget.ColorPickerComponent colorPickerComponent, Rect rect) {
-        if (r == null || colorPickerComponent == null) return;
-
-        pushId(colorPickerComponent.getId());
-
-        boolean changed = colorPickerComponent.colorPicker().render(
-                r,
-                input(),
-                theme,
-                rect.x,
-                rect.y,
-                rect.w,
-                rect.h,
-                true
-        );
-
-        if (changed) {
-            Runnable cb = colorPickerComponent.getOnChange();
-            if (cb != null) cb.run();
-        }
-
-        popId();
+    private record InteractionState(boolean hovered, boolean clicked) {
     }
 
-    /**
-     * Renders a {@link FileBrowerComponent} using the underlying {@link com.miry.ui.widgets.FileBrowser} widget logic.
-     *
-     * <p>This method integrates the widget into the IMUI layout system:</p>
-     * <ul>
-     *   <li>Allocates a rectangle in the current flow (like other components).</li>
-     *   <li>Wraps the widget in a {@link ScrollAreaComponent}-like behavior using the existing Ui.beginScrollArea / endScrollArea.</li>
-     *   <li>Computes {@code contentHeight} from the widget ({@link FileBrowser#computeContentHeight()} ()}).</li>
-     *   <li>Propagates the scroll offset to the widget via {@code scrollArea.scrollY()}.</li>
-     *   <li>Triggers {@code onFileSelected} when selection changes (and callback is not null).</li>
-     * </ul>
-     *
-     * <p>Height behavior:</p>
-     * <ul>
-     *   <li>If {@code component} has no explicit height concept, we default to "fill remaining panel height"
-     *       (same behavior as your ScrollAreaComponent default).</li>
-     * </ul>
-     */
-    public void fileBrowser(UiRenderer r, FileBrowerComponent component) {
-        if (r == null || component == null) return;
-
-        pushId(component.getId());
-
-        int h = Math.max(1, this.contentH - cursorY);
-        Rect rect = nextRect(h);
-
-        fileBrowser(r, component, rect);
-
-        popId();
+    private record DragState(boolean hovered, boolean active) {
     }
 
-    /**
-     * Rect-based overload for Grid/Group placement.
-     *
-     * <p>Uses the given rect exactly and does not touch cursorY.</p>
-     */
-    private void fileBrowser(UiRenderer r, FileBrowerComponent component, Rect rect) {
-        if (r == null || component == null) return;
-
-        pushId(component.getId());
-
-        // Compute content height (TreeView is a list -> perfect for scroll area)
-        int contentH = Math.max(rect.h, component.computeContentHeight());
-
-        // We need a stable key for scroll state; using the component id is fine.
-        String key = component.getId();
-
-        Ui.ScrollArea area = beginScrollArea(r, key, rect.x, rect.y, rect.w, rect.h, contentH);
-
-        // Pass the scroll offset to the widget (widget expects an int)
-        int scrollOffset = Math.round(area.scrollY());
-
-        // Keep track of selection changes to trigger callback once.
-        java.io.File before = component.selectedFile();
-
-        // Render the widget INSIDE the scroll area clipping.
-        // Note: we use the scroll area's renderer so clipping is active.
-        component.fileBrowser().render(
-                area.renderer(),
-                uiContext,
-                input(),
-                theme,
-                rect.x,
-                rect.y,
-                rect.w,
-                rect.h,
-                scrollOffset,
-                true
-        );
-
-        java.io.File after = component.selectedFile();
-        if (after != before) {
-            component.triggerFileSelected(after);
-        }
-
-        endScrollArea(area);
-
-        popId();
+    private record SliderResult(float value, boolean changed) {
     }
 
     private static final class Anim {
@@ -1718,9 +1590,15 @@ public final class Ui {
         private float scrollY;
     }
 
-    public record ScrollArea(UiRenderer renderer, int id, int x, int y, int width, int height, int maxScroll,
-                             float scrollY) {
+    public record ScrollArea(
+            UiRenderer renderer,
+            int id,
+            int x,
+            int y,
+            int width,
+            int height,
+            int maxScroll,
+            float scrollY
+    ) {
     }
-
-
 }

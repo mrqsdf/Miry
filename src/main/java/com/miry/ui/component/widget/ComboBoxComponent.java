@@ -10,6 +10,7 @@ import com.miry.ui.theme.Theme;
 import com.miry.ui.widgets.ComboBox;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 public class ComboBoxComponent<T> extends Component {
 
@@ -18,6 +19,7 @@ public class ComboBoxComponent<T> extends Component {
     private Color hoverColor;
     private Color textColor;
     private String themeId;
+    private Consumer<T> onSelectionChanged;
 
     public ComboBoxComponent(String id, List<T> items, int selectedIndex) {
         super(id);
@@ -103,14 +105,33 @@ public class ComboBoxComponent<T> extends Component {
             return themeId != null ? ui.theme().getColor(themeId + ".text") != null ? ui.theme().getColor(themeId + ".text") : new Color(Theme.toArgb(ui.theme().text)) : new Color(Theme.toArgb(ui.theme().text));
     }
 
+    public ComboBoxComponent<T> setOnSelectionChanged(Consumer<T> onSelectionChanged) {
+        this.onSelectionChanged = onSelectionChanged;
+        return this;
+    }
+
+    public Consumer<T> getOnSelectionChanged() {
+        return onSelectionChanged;
+    }
+
     @Override
     public void handleKey(UiContext uiContext, KeyEvent keyEvent) {
-        if (comboBox.isOpen() && comboBox.handleKey(keyEvent)) return;
+        if (comboBox.isOpen() && comboBox.handleKey(keyEvent)){
+            T selectedItem = comboBox.selected();
+            if (onSelectionChanged != null) {
+                onSelectionChanged.accept(selectedItem);
+            }
+        }
     }
 
     @Override
     public void handleTextInput(UiContext uiContext, TextInputEvent textInputEvent) {
-        if (comboBox.isOpen() && comboBox.handleTextInput(textInputEvent)) return;
+        if (comboBox.isOpen() && comboBox.handleTextInput(textInputEvent)) {
+            T selectedItem = comboBox.selected();
+            if (onSelectionChanged != null) {
+                onSelectionChanged.accept(selectedItem);
+            }
+        }
 
     }
 }
