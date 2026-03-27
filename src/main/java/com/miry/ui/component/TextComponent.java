@@ -2,9 +2,6 @@ package com.miry.ui.component;
 
 import com.miry.ui.Ui;
 import com.miry.ui.theme.Theme;
-
-import java.util.ArrayList;
-import java.util.List;
 //todo add doc
 
 public class TextComponent extends Component{
